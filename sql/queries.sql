@@ -128,4 +128,26 @@ JOIN customers c
 JOIN shipments s
     ON o.order_id = s.order_id
 WHERE s.shipping_status = 'Pending';
->>>>>>> 941612c (Add customer lifetime value segmentation query)
+
+-- Customer lifetime value and segmentation
+SELECT
+    c.customer_id,
+    c.first_name,
+    c.last_name,
+    c.state,
+    COUNT(DISTINCT o.order_id) AS total_orders,
+    SUM(oi.quantity * oi.unit_price) AS lifetime_value,
+    CASE
+        WHEN SUM(oi.quantity * oi.unit_price) >= 150 THEN 'High Value'
+        WHEN SUM(oi.quantity * oi.unit_price) >= 75 THEN 'Medium Value'
+        ELSE 'Low Value'
+    END AS customer_segment
+FROM customers c
+JOIN orders o
+    ON c.customer_id = o.customer_id
+JOIN order_items oi
+    ON o.order_id = oi.order_id
+GROUP BY c.customer_id, c.first_name, c.last_name, c.state
+ORDER BY lifetime_value DESC;
+
+

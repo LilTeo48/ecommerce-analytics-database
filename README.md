@@ -1,20 +1,30 @@
-<<<<<<< HEAD
 # E-Commerce Analytics Database
 
-A PostgreSQL database project that simulates an e-commerce platform and uses SQL queries to analyze customers, products, orders, payments, and shipments.
+A PostgreSQL-based analytics project designed to simulate a real-world e-commerce database system. This project demonstrates relational database design, SQL analytics, customer segmentation, and business intelligence reporting workflows.
 
-## Project Overview
-
-This project demonstrates relational database design, normalized schemas, SQL querying, and business-focused analytics for an online store environment.
+---
 
 ## Technologies Used
 
 - PostgreSQL
 - SQL
-- Git
-- GitHub
+- Git & GitHub
+
+---
+
+## Project Features
+
+- Designed normalized relational database schemas
+- Built analytical SQL queries for business reporting
+- Implemented customer lifetime value segmentation
+- Generated revenue and sales performance insights
+- Simulated operational workflows using sample datasets
+
+---
 
 ## Database Tables
+
+The project includes the following relational tables:
 
 - customers
 - products
@@ -23,89 +33,57 @@ This project demonstrates relational database design, normalized schemas, SQL qu
 - payments
 - shipments
 
-## Key Features
+---
 
-- Designed normalized relational database schemas
-- Created primary and foreign key relationships
-- Inserted sample business data
-- Wrote analytical SQL queries using joins, aggregations, grouping, and filtering
-- Generated insights related to revenue, products, customers, orders, and shipments
+## Analytics Queries Included
 
-## Example Business Questions Answered
+### Revenue Analysis
+- Total revenue
+- Revenue by product category
+- Average order value
 
-- What is total revenue?
-- Which products sell the most?
-- Which categories generate the most revenue?
-- Which customers made repeat purchases?
-- What is the average order value?
-- Which states have the most orders?
+### Product Analytics
+- Top-selling products
+- Product sales trends
+
+### Customer Analytics
+- Repeat customers
+- Customer lifetime value
+- Customer segmentation
+
+### Operational Reporting
+- Orders by state
+- Pending shipments
+
+---
+
+## Example Business Questions Solved
+
+- Which products generate the most revenue?
+- Which customers are considered high-value?
+- What categories perform best financially?
 - Which shipments are still pending?
+- Which states generate the most orders?
 
-## Files
+---
 
-- `schema.sql` — creates database tables and relationships
-- `sample_data.sql` — inserts sample e-commerce data
-- `queries.sql` — contains analytical SQL queries
+## Folder Structure
+
+```text
+sql/
+├── schema.sql
+├── sample_data.sql
+└── queries.sql
 
 ## Future Improvements
 
-- Add more sample data
-- Build a dashboard for e-commerce metrics
-- Add stored procedures or views
-- Connect database to a Python analytics script
-=======
-# E-Commerce Analytics Database
-
-A PostgreSQL database project that simulates an e-commerce platform and uses SQL queries to analyze customers, products, orders, payments, and shipments.
-
-## Project Overview
-
-This project demonstrates relational database design, normalized schemas, SQL querying, and business-focused analytics for an online store environment.
-
-## Technologies Used
-
-- PostgreSQL
-- SQL
-- Git
-- GitHub
-
-## Database Tables
-
-- customers
-- products
-- orders
-- order_items
-- payments
-- shipments
-
-## Key Features
-
-- Designed normalized relational database schemas
-- Created primary and foreign key relationships
-- Inserted sample business data
-- Wrote analytical SQL queries using joins, aggregations, grouping, and filtering
-- Generated insights related to revenue, products, customers, orders, and shipments
-
-## Example Business Questions Answered
-
-- What is total revenue?
-- Which products sell the most?
-- Which categories generate the most revenue?
-- Which customers made repeat purchases?
-- What is the average order value?
-- Which states have the most orders?
-- Which shipments are still pending?
-
-## Files
-
-- `schema.sql` — creates database tables and relationships
-- `sample_data.sql` — inserts sample e-commerce data
-- `queries.sql` — contains analytical SQL queries
-
-## Future Improvements
-
-- Add more sample data
-- Build a dashboard for e-commerce metrics
-- Add stored procedures or views
-- Connect database to a Python analytics script
->>>>>>> 941612c (Add customer lifetime value segmentation query)
+- Add advanced SQL window functions for trend analysis
+- Build an interactive Power BI or Tableau dashboard
+- Create Python ETL workflows for automated data loading
+- Add stored procedures and database triggers
+- Containerize the database using Docker
+- Implement indexing and query optimization techniques
+- Add monthly sales trend and forecasting queries
+- Integrate REST API endpoints using FastAPI
+- Expand the dataset to simulate large-scale e-commerce traffic
+- Add customer retention and churn analysis

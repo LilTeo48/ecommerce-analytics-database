@@ -1,89 +1,161 @@
-# E-Commerce Analytics Database
+# E-Commerce Database & Analytics System
 
-A PostgreSQL-based analytics project designed to simulate a real-world e-commerce database system. This project demonstrates relational database design, SQL analytics, customer segmentation, and business intelligence reporting workflows.
+A PostgreSQL-based e-commerce database designed to simulate a real-world online retail system. This project demonstrates relational database design, data integrity, and business analytics using SQL.
+
+## 📌 Project Overview
+
+This project models the backend database for an e-commerce platform and answers common business questions through SQL analytics.
+
+The database tracks:
+
+- Customers
+- Products
+- Orders
+- Order Items
+- Payments
+- Shipments
+
+Using SQL, the project generates insights into sales performance, customer behavior, inventory management, and shipping operations.
 
 ---
 
-## Technologies Used
+## 🛠️ Technologies Used
 
 - PostgreSQL
 - SQL
-- Git & GitHub
+- Git
+- GitHub
 
 ---
 
-## Project Features
+## 📂 Project Structure
 
-- Designed normalized relational database schemas
-- Built analytical SQL queries for business reporting
-- Implemented customer lifetime value segmentation
-- Generated revenue and sales performance insights
-- Simulated operational workflows using sample datasets
-
----
-
-## Database Tables
-
-The project includes the following relational tables:
-
-- customers
-- products
-- orders
-- order_items
-- payments
-- shipments
+```
+ecommerce-analytics-database/
+│
+├── sql/
+│   ├── 01_schema.sql
+│   ├── 02_seed_data.sql
+│   └── 03_business_queries.sql
+│
+├── README.md
+└── .gitignore
+```
 
 ---
 
-## Analytics Queries Included
+## 🗄️ Database Schema
 
-### Revenue Analysis
-- Total revenue
-- Revenue by product category
-- Average order value
+The database consists of six related tables:
+
+- Customers
+- Products
+- Orders
+- Order Items
+- Payments
+- Shipments
+
+Relationships include:
+
+- One customer can place many orders.
+- One order can contain many products.
+- Products can appear in many orders.
+- Each order has one payment.
+- Each order has one shipment.
+
+---
+
+## 📊 Business Analytics
+
+The project includes SQL reports for:
+
+### Sales Analytics
+
+- Total Revenue
+- Monthly Revenue
+- Average Order Value
 
 ### Product Analytics
-- Top-selling products
-- Product sales trends
+
+- Top Selling Products
+- Revenue by Product Category
+- Products Never Ordered
+- Low Stock Products
 
 ### Customer Analytics
-- Repeat customers
-- Customer lifetime value
-- Customer segmentation
 
-### Operational Reporting
-- Orders by state
-- Pending shipments
+- Repeat Customers
+- Top Customers by Spending
+- Customer Lifetime Value (CLV)
+- Customer Segmentation
+
+### Operations Analytics
+
+- Orders by State
+- Pending Shipments
 
 ---
 
-## Example Business Questions Solved
+## ▶️ Getting Started
 
-- Which products generate the most revenue?
-- Which customers are considered high-value?
-- What categories perform best financially?
+### Create the database
+
+```sql
+CREATE DATABASE ecommerce_db;
+```
+
+### Load the schema
+
+```bash
+psql -d ecommerce_db -f sql/01_schema.sql
+```
+
+### Insert sample data
+
+```bash
+psql -d ecommerce_db -f sql/02_seed_data.sql
+```
+
+### Run analytics queries
+
+```bash
+psql -d ecommerce_db -f sql/03_business_queries.sql
+```
+
+---
+
+## 📈 Example Insights
+
+This project can answer questions such as:
+
+- What is the total revenue?
+- Which products generate the most sales?
+- Who are the highest-value customers?
+- Which customers are repeat buyers?
+- Which products have never been sold?
+- Which products are running low on inventory?
+- How much revenue is generated each month?
 - Which shipments are still pending?
-- Which states generate the most orders?
 
 ---
 
-## Folder Structure
+## 🚀 Future Improvements
 
-```text
-sql/
-├── schema.sql
-├── sample_data.sql
-└── queries.sql
+Planned enhancements include:
 
-## Future Improvements
+- Python integration using SQLAlchemy
+- Pandas data analysis
+- Interactive Streamlit dashboard
+- Data visualizations
+- Additional business analytics queries
+- Docker support
+- Automated reporting
 
-- Add advanced SQL window functions for trend analysis
-- Build an interactive Power BI or Tableau dashboard
-- Create Python ETL workflows for automated data loading
-- Add stored procedures and database triggers
-- Containerize the database using Docker
-- Implement indexing and query optimization techniques
-- Add monthly sales trend and forecasting queries
-- Integrate REST API endpoints using FastAPI
-- Expand the dataset to simulate large-scale e-commerce traffic
-- Add customer retention and churn analysis
+---
+
+## 👤 Author
+
+**Tyler Chadwick**
+
+- GitHub: https://github.com/LilTeo48
+- LinkedIn: https://www.linkedin.com/in/tyler-chadwick-81b9a6275/

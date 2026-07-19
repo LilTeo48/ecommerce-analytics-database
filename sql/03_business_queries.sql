@@ -141,3 +141,57 @@ SELECT
 FROM products
 WHERE stock_quantity < 100
 ORDER BY stock_quantity ASC;
+
+-- Monthly Revenue 
+SELECT
+    DATE_TRUNC('month', order_date) AS month,
+    SUM(total_amount) AS revenue
+FROM orders
+WHERE order_status = 'Completed'
+GROUP BY month
+ORDER BY month;
+
+-- Best Selling Categories 
+SELECT
+    p.category,
+    SUM(oi.quantity) AS units_sold
+FROM order_items oi
+JOIN products p
+    ON oi.product_id = p.product_id
+GROUP BY p.category
+ORDER BY units_sold DESC;
+
+-- Average Order Value
+SELECT 
+    ROUND(AVG(total_amount), 2) AS average_order_value
+FROM orders
+WHERE order_status = 'Completed';
+
+-- Orders by Status
+SELECT
+    order_status,
+    COUNT(*) AS total_orders
+FROM orders
+GROUP BY order_status
+ORDER BY total_orders DESC;
+
+-- Top Revenue Products
+SELECT
+    p.product_name,
+    SUM(oi.quantity * oi.price_each) AS revenue
+FROM order_items oi
+JOIN products p 
+    ON oi.product_id = p.product_id
+GROUP BY p.product_name
+ORDER BY revenue DESC
+LIMIT 10;
+
+-- Customers Who Haven't Ordered Recently 
+SELECT
+    c.customer_id,
+    c.first_name,
+    c.last_name,
+    MAX(o.order_date) AS last_order
+FROM customers c 
+LEFT JOIN orders o
+    ON c.customer_id = o.customer_id     

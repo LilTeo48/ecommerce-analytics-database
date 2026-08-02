@@ -259,4 +259,88 @@ def delete_payment(
     db.delete(payment)
     db.commit()
 
-    return payment   
+    return payment  
+
+# -------------------------
+# Shipment CRUD
+# -------------------------
+
+def create_shipment(
+    db: Session,
+    shipment: schemas.ShipmentCreate,
+) -> models.Shipment:
+    db_shipment = models.Shipment(**shipment.model_dump())
+
+    db.add(db_shipment)
+    db.commit()
+    db.refresh(db_shipment)
+
+    return db_shipment
+
+
+def get_shipment(
+    db: Session,
+    shipment_id: int,
+) -> models.Shipment | None:
+    return (
+        db.query(models.Shipment)
+        .filter(models.Shipment.shipment_id == shipment_id)
+        .first()
+    )
+
+
+def get_shipment_by_order(
+    db: Session,
+    order_id: int,
+) -> models.Shipment | None:
+    return (
+        db.query(models.Shipment)
+        .filter(models.Shipment.order_id == order_id)
+        .first()
+    )
+
+
+def get_shipments(
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+) -> list[models.Shipment]:
+    return (
+        db.query(models.Shipment)
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+
+def update_shipment_status(
+    db: Session,
+    shipment_id: int,
+    shipping_status: str,
+) -> models.Shipment | None:
+    shipment = get_shipment(db, shipment_id)
+
+    if shipment is None:
+        return None
+
+    shipment.shipping_status = shipping_status
+
+    db.commit()
+    db.refresh(shipment)
+
+    return shipment
+
+
+def delete_shipment(
+    db: Session,
+    shipment_id: int,
+) -> models.Shipment | None:
+    shipment = get_shipment(db, shipment_id)
+
+    if shipment is None:
+        return None
+
+    db.delete(shipment)
+    db.commit()
+
+    return shipment     

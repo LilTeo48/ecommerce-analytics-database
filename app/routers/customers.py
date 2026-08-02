@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app import crud, schemas
@@ -35,12 +35,11 @@ def create_customer(
     response_model=list[schemas.CustomerResponse],
 )
 def get_customers(
-    skip: int = 0,
-    limit: int = 100,
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
     return crud.get_customers(db, skip=skip, limit=limit)
-
 
 @router.get(
     "/{customer_id}",

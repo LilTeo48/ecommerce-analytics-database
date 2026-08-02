@@ -1,7 +1,13 @@
 from datetime import date
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    field_validator,
+)
 
 
 # -------------------------
@@ -147,7 +153,15 @@ class StockUpdate(BaseModel):
 
 
 class StockAdjustment(BaseModel):
-    adjustment: int = Field(ne=0)
+    adjustment: int
+
+    @field_validator("adjustment")
+    @classmethod
+    def adjustment_cannot_be_zero(cls, value: int) -> int:
+        if value == 0:
+            raise ValueError("Adjustment cannot be zero.")
+
+        return value
 
 
 class InventoryResponse(BaseModel):
@@ -191,6 +205,7 @@ class TopCustomerResponse(BaseModel):
     last_name: str
     total_orders: int
     total_spent: Decimal
+
 
 # -------------------------
 # Additional analytics schemas

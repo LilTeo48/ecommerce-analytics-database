@@ -1,260 +1,215 @@
-# E-Commerce Analytics API
+# E-Commerce Analytics Database API
 
-A full-stack backend project that simulates the backend of a real-world e-commerce platform using **FastAPI**, **PostgreSQL**, and **SQLAlchemy**.
+A production-style backend REST API built with **FastAPI**, **PostgreSQL**, and **SQLAlchemy** that manages an e-commerce database and provides business analytics through REST endpoints.
 
-This project demonstrates backend software engineering concepts including REST API development, relational database design, CRUD operations, data validation, and business analytics.
+## Features
 
----
-
-# Features
-
-- RESTful API built with FastAPI
-- PostgreSQL relational database
-- SQLAlchemy ORM
-- Pydantic request/response validation
-- Customer CRUD API
-- Product CRUD API
-- Business analytics SQL queries
-- Interactive Swagger/OpenAPI documentation
-- Seed data for testing
+- Customer Management
+- Product Management
+- Order Management
+- Payment Processing
+- Shipment Tracking
+- Inventory Management
+- Business Analytics
+- Automatic API Documentation
+- Input Validation
+- Automated Testing
 
 ---
 
-# Technologies
+## Tech Stack
 
-- Python 3
+### Backend
+- Python
 - FastAPI
 - SQLAlchemy
 - PostgreSQL
 - Pydantic
-- Uvicorn
-- psycopg2
+
+### Testing
+- Pytest
+- FastAPI TestClient
+
+### Tools
 - Git
 - GitHub
+- Uvicorn
 
 ---
 
-# Project Structure
+## Project Structure
 
 ```text
 ecommerce-analytics-database/
 │
 ├── app/
 │   ├── routers/
-│   │   ├── customers.py
-│   │   ├── products.py
-│   │   └── __init__.py
-│   │
 │   ├── crud.py
 │   ├── database.py
 │   ├── main.py
 │   ├── models.py
 │   └── schemas.py
 │
+├── tests/
+│
 ├── sql/
-│   ├── 01_schema.sql
-│   ├── 02_seed_data.sql
-│   └── 03_business_queries.sql
 │
 ├── requirements.txt
-├── README.md
-├── .gitignore
-└── .env
+└── README.md
 ```
 
 ---
 
-# Database Design
+## API Modules
 
-The application models six related tables.
+### Customers
+- Create Customer
+- Get Customers
+- Get Customer
+- Delete Customer
 
+### Products
+- Create Product
+- Get Products
+- Get Product
+- Delete Product
+
+### Orders
+- Create Order
+- Get Orders
+- Get Order
+- Delete Order
+
+### Payments
+- Create Payment
+- Get Payments
+- Get Payment
+- Delete Payment
+
+### Shipments
+- Create Shipment
+- Update Shipment Status
+- Get Shipments
+- Delete Shipment
+
+### Inventory
+- View Inventory
+- View Low Stock Products
+- Update Stock
+- Adjust Stock
+
+### Analytics
+
+- Revenue Summary
+- Monthly Revenue
+- Revenue by Category
+- Top Selling Products
+- Top Customers
+- Orders by Status
+- Payments by Method
+- Shipment Status Analytics
+- Inventory Value
+- Never Ordered Products
+
+---
+
+## Testing
+
+This project includes automated API tests using **Pytest**.
+
+Current test coverage includes:
+
+- Health endpoints
 - Customers
 - Products
 - Orders
-- Order Items
 - Payments
 - Shipments
+- Inventory
+- Analytics
 
-Relationships include:
+**48 automated tests passing**
 
-- One customer → many orders
-- One order → many order items
-- One product → many order items
-- One order → one payment
-- One order → one shipment
+Run all tests:
 
----
-
-# Current API
-
-## Customers
-
-- POST `/customers`
-- GET `/customers`
-- GET `/customers/{customer_id}`
-- DELETE `/customers/{customer_id}`
-
-## Products
-
-- POST `/products`
-- GET `/products`
-- GET `/products/{product_id}`
-- PATCH `/products/{product_id}/stock`
-- DELETE `/products/{product_id}`
+```bash
+python -m pytest -v
+```
 
 ---
 
-# Business Analytics
+## Running the Project
 
-SQL reports currently include:
-
-- Total revenue
-- Monthly revenue
-- Average order value
-- Top-selling products
-- Revenue by category
-- Repeat customers
-- Customer lifetime value
-- Products never ordered
-- Low inventory report
-- Pending shipments
-
----
-
-# Running the Project
-
-## Clone the repository
+Clone the repository
 
 ```bash
 git clone https://github.com/LilTeo48/ecommerce-analytics-database.git
-cd ecommerce-analytics-database
 ```
 
-## Create a virtual environment
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-## Install dependencies
+Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
----
-
-# PostgreSQL Setup
-
-Create the database:
-
-```sql
-CREATE DATABASE ecommerce_analytics;
-```
-
-Load the schema:
-
-```bash
-psql -d ecommerce_analytics -f sql/01_schema.sql
-```
-
-Load seed data:
-
-```bash
-psql -d ecommerce_analytics -f sql/02_seed_data.sql
-```
-
----
-
-# Environment Variables
-
-Create a `.env` file in the project root.
-
-```env
-DATABASE_URL=postgresql+psycopg2://YOUR_USERNAME@localhost:5432/ecommerce_analytics
-```
-
----
-
-# Run the API
+Run the API
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
----
-
-# Swagger Documentation
-
-FastAPI automatically generates interactive API documentation.
-
-Open:
+Swagger Documentation
 
 ```
 http://127.0.0.1:8000/docs
 ```
 
-You can create, retrieve, update, and delete customers and products directly from the browser.
-
----
-
-# Example Endpoints
+ReDoc
 
 ```
-GET /
-GET /db
-
-POST /customers
-GET /customers
-GET /customers/{id}
-DELETE /customers/{id}
-
-POST /products
-GET /products
-GET /products/{id}
-PATCH /products/{id}/stock
-DELETE /products/{id}
+http://127.0.0.1:8000/redoc
 ```
 
 ---
 
-# Current Progress
+## Example Analytics Endpoints
 
-- ✅ PostgreSQL database
-- ✅ SQL schema
-- ✅ Seed data
-- ✅ SQL analytics
-- ✅ SQLAlchemy models
-- ✅ Pydantic schemas
-- ✅ Customer CRUD
-- ✅ Product CRUD
-- ✅ FastAPI routers
-- ✅ Interactive Swagger documentation
+```
+GET /analytics/revenue/summary
+
+GET /analytics/revenue/monthly
+
+GET /analytics/products/top-selling
+
+GET /analytics/customers/top
+
+GET /analytics/orders/by-status
+
+GET /analytics/inventory/value
+```
 
 ---
 
-# Planned Features
+## Future Improvements
 
-- Orders API
-- Order Items API
-- Payments API
-- Shipments API
-- Authentication & Authorization
-- Pagination
-- Filtering & Search
-- Analytics API endpoints
-- React frontend dashboard
-- Docker support
-- Pytest unit tests
+- Docker Support
 - GitHub Actions CI/CD
-- Deployment to Render or Railway
+- Streamlit Analytics Dashboard
+- Authentication (JWT)
+- Role-Based Authorization
+- API Deployment (Render/Railway)
+- Redis Caching
 
 ---
 
-# Author
+## Author
 
-**Tyler Chadwick**
+Tyler Chadwick
 
-- GitHub: https://github.com/LilTeo48
-- LinkedIn: https://www.linkedin.com/in/tyler-chadwick-81b9a6275/
+Bachelor of Arts in Computer Science
+### Connect with me
+
+- **GitHub:** https://github.com/LilTeo48
+- **LinkedIn:** https://www.linkedin.com/in/tyler-chadwick-81b9a6275/
+
+Backend Software Engineer | Python | FastAPI | PostgreSQL | SQL

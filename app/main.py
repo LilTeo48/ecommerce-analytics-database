@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from sqlalchemy import text
 
 from app.database import SessionLocal
-from app.routers import customers, orders, payments, products, shipments
+from app.routers import customers, inventory, orders, payments, products, shipments
 
 app = FastAPI(
     title="E-Commerce Analytics API",
@@ -14,6 +14,7 @@ app.include_router(products.router)
 app.include_router(orders.router)
 app.include_router(payments.router)
 app.include_router(shipments.router)
+app.include_router(inventory.router)
 
 
 @app.get("/")

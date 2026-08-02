@@ -343,4 +343,74 @@ def delete_shipment(
     db.delete(shipment)
     db.commit()
 
-    return shipment     
+    return shipment
+
+# -------------------------
+# Inventory CRUD
+# -------------------------
+
+def get_inventory(
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+) -> list[models.Product]:
+    return (
+        db.query(models.Product)
+        .order_by(models.Product.stock_quantity.asc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+
+def get_low_stock_products(
+    db: Session,
+    threshold: int = 10,
+) -> list[models.Product]:
+    return (
+        db.query(models.Product)
+        .filter(models.Product.stock_quantity <= threshold)
+        .order_by(models.Product.stock_quantity.asc())
+        .all()
+    )
+
+
+def set_product_stock(
+    db: Session,
+    product_id: int,
+    stock_quantity: int,
+) -> models.Product | None:
+    product = get_product(db, product_id)
+
+    if product is None:
+        return None
+
+    product.stock_quantity = stock_quantity
+
+    db.commit()
+    db.refresh(product)
+
+    return product
+
+
+def adjust_product_stock(
+    db: Session,
+    product_id: int,
+    adjustment: int,
+) -> models.Product | None:
+    product = get_product(db, product_id)
+
+    if product is None:
+        return None
+
+    new_quantity = product.stock_quantity + adjustment
+
+    if new_quantity < 0:
+        raise ValueError("Stock quantity cannot be negative.")
+
+    product.stock_quantity = new_quantity
+
+    db.commit()
+    db.refresh(product)
+
+    return product        

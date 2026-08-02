@@ -136,3 +136,23 @@ class ShipmentResponse(ShipmentBase):
     shipment_id: int
 
     model_config = ConfigDict(from_attributes=True)
+
+# -------------------------
+# Inventory schemas
+# -------------------------
+
+class StockUpdate(BaseModel):
+    stock_quantity: int = Field(ge=0)
+
+
+class StockAdjustment(BaseModel):
+    adjustment: int = Field(ne=0)
+
+
+class InventoryResponse(BaseModel):
+    product_id: int
+    product_name: str
+    category: str | None
+    stock_quantity: int
+
+    model_config = ConfigDict(from_attributes=True)  

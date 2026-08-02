@@ -137,6 +137,7 @@ class ShipmentResponse(ShipmentBase):
 
     model_config = ConfigDict(from_attributes=True)
 
+
 # -------------------------
 # Inventory schemas
 # -------------------------
@@ -155,4 +156,38 @@ class InventoryResponse(BaseModel):
     category: str | None
     stock_quantity: int
 
-    model_config = ConfigDict(from_attributes=True)  
+    model_config = ConfigDict(from_attributes=True)
+
+# -------------------------
+# Analytics schemas
+# -------------------------
+
+class RevenueSummary(BaseModel):
+    total_revenue: Decimal
+    average_order_value: Decimal
+    total_orders: int
+
+
+class MonthlyRevenueResponse(BaseModel):
+    month: date
+    revenue: Decimal
+
+
+class CategoryRevenueResponse(BaseModel):
+    category: str | None
+    revenue: Decimal
+
+
+class TopProductResponse(BaseModel):
+    product_id: int
+    product_name: str
+    units_sold: int
+    revenue: Decimal
+
+
+class TopCustomerResponse(BaseModel):
+    customer_id: int
+    first_name: str
+    last_name: str
+    total_orders: int
+    total_spent: Decimal

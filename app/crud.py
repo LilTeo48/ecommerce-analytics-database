@@ -1,3 +1,4 @@
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app import models, schemas
@@ -413,4 +414,162 @@ def adjust_product_stock(
     db.commit()
     db.refresh(product)
 
-    return product        
+    return product
+
+# -------------------------
+# Analytics queries
+# -------------------------
+
+def get_revenue_summary(
+    db: Session,
+) -> dict:
+    total_revenue = (
+        db.query(func.coalesce(func.sum(models.Order.total_amount), 0))
+        .scalar()
+    )
+
+    total_orders = db.query(func.count(models.Order.order_id)).scalar()
+
+    average_order_value = (
+        db.query(func.coalesce(func.avg(models.Order.total_amount), 0))
+        .scalar()
+    )
+
+    return {
+        "total_revenue": total_revenue,
+        "average_order_value": average_order_value,
+        "total_orders": total_orders,
+    }
+
+
+def get_monthly_revenue(
+    db: Session,
+) -> list[dict]:
+    month = func.date_trunc("month", models.Order.order_date).label("month")
+    revenue = func.sum(models.Order.total_amount).label("revenue")
+
+    rows = (
+        db.query(month, revenue)
+        .group_by(month)
+        .order_by(month)
+        .all()
+    )
+
+    return [
+        {
+            "month": row.month.date(),
+            "revenue": row.revenue,
+        }
+        for row in rows
+    ]
+
+
+def get_revenue_by_category(
+    db: Session,
+) -> list[dict]:
+    revenue = func.sum(
+        models.OrderItem.quantity * models.OrderItem.unit_price
+    ).label("revenue")
+
+    rows = (
+        db.query(
+            models.Product.category.label("category"),
+            revenue,
+        )
+        .join(
+            models.OrderItem,
+            models.Product.product_id == models.OrderItem.product_id,
+        )
+        .group_by(models.Product.category)
+        .order_by(revenue.desc())
+        .all()
+    )
+
+    return [
+        {
+            "category": row.category,
+            "revenue": row.revenue,
+        }
+        for row in rows
+    ]
+
+
+def get_top_selling_products(
+    db: Session,
+    limit: int = 5,
+) -> list[dict]:
+    units_sold = func.sum(models.OrderItem.quantity).label("units_sold")
+    revenue = func.sum(
+        models.OrderItem.quantity * models.OrderItem.unit_price
+    ).label("revenue")
+
+    rows = (
+        db.query(
+            models.Product.product_id,
+            models.Product.product_name,
+            units_sold,
+            revenue,
+        )
+        .join(
+            models.OrderItem,
+            models.Product.product_id == models.OrderItem.product_id,
+        )
+        .group_by(
+            models.Product.product_id,
+            models.Product.product_name,
+        )
+        .order_by(units_sold.desc())
+        .limit(limit)
+        .all()
+    )
+
+    return [
+        {
+            "product_id": row.product_id,
+            "product_name": row.product_name,
+            "units_sold": row.units_sold,
+            "revenue": row.revenue,
+        }
+        for row in rows
+    ]
+
+
+def get_top_customers(
+    db: Session,
+    limit: int = 5,
+) -> list[dict]:
+    total_orders = func.count(models.Order.order_id).label("total_orders")
+    total_spent = func.sum(models.Order.total_amount).label("total_spent")
+
+    rows = (
+        db.query(
+            models.Customer.customer_id,
+            models.Customer.first_name,
+            models.Customer.last_name,
+            total_orders,
+            total_spent,
+        )
+        .join(
+            models.Order,
+            models.Customer.customer_id == models.Order.customer_id,
+        )
+        .group_by(
+            models.Customer.customer_id,
+            models.Customer.first_name,
+            models.Customer.last_name,
+        )
+        .order_by(total_spent.desc())
+        .limit(limit)
+        .all()
+    )
+
+    return [
+        {
+            "customer_id": row.customer_id,
+            "first_name": row.first_name,
+            "last_name": row.last_name,
+            "total_orders": row.total_orders,
+            "total_spent": row.total_spent,
+        }
+        for row in rows
+    ]            

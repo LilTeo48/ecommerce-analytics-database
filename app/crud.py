@@ -194,3 +194,69 @@ def get_orders_by_customer(
         .filter(models.Order.customer_id == customer_id)
         .all()
     )
+
+# -------------------------
+# Payment CRUD
+# -------------------------
+
+def create_payment(
+    db: Session,
+    payment: schemas.PaymentCreate,
+) -> models.Payment:
+    db_payment = models.Payment(**payment.model_dump())
+
+    db.add(db_payment)
+    db.commit()
+    db.refresh(db_payment)
+
+    return db_payment
+
+
+def get_payment(
+    db: Session,
+    payment_id: int,
+) -> models.Payment | None:
+    return (
+        db.query(models.Payment)
+        .filter(models.Payment.payment_id == payment_id)
+        .first()
+    )
+
+
+def get_payment_by_order(
+    db: Session,
+    order_id: int,
+) -> models.Payment | None:
+    return (
+        db.query(models.Payment)
+        .filter(models.Payment.order_id == order_id)
+        .first()
+    )
+
+
+def get_payments(
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+) -> list[models.Payment]:
+    return (
+        db.query(models.Payment)
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+
+def delete_payment(
+    db: Session,
+    payment_id: int,
+) -> models.Payment | None:
+    payment = get_payment(db, payment_id)
+
+    if payment is None:
+        return None
+
+    db.delete(payment)
+    db.commit()
+
+    return payment   

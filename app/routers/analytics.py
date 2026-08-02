@@ -60,3 +60,52 @@ def top_customers(
     db: Session = Depends(get_db),
 ):
     return crud.get_top_customers(db, limit=limit)
+
+@router.get(
+    "/orders/by-status",
+    response_model=list[schemas.OrderStatusAnalyticsResponse],
+)
+def orders_by_status(
+    db: Session = Depends(get_db),
+):
+    return crud.get_orders_by_status_analytics(db)
+
+
+@router.get(
+    "/payments/by-method",
+    response_model=list[schemas.PaymentMethodAnalyticsResponse],
+)
+def payments_by_method(
+    db: Session = Depends(get_db),
+):
+    return crud.get_payments_by_method_analytics(db)
+
+
+@router.get(
+    "/shipments/by-status",
+    response_model=list[schemas.ShipmentStatusAnalyticsResponse],
+)
+def shipments_by_status(
+    db: Session = Depends(get_db),
+):
+    return crud.get_shipments_by_status_analytics(db)
+
+
+@router.get(
+    "/inventory/value",
+    response_model=schemas.InventoryValueResponse,
+)
+def inventory_value(
+    db: Session = Depends(get_db),
+):
+    return crud.get_inventory_value(db)
+
+
+@router.get(
+    "/products/never-ordered",
+    response_model=list[schemas.NeverOrderedProductResponse],
+)
+def never_ordered_products(
+    db: Session = Depends(get_db),
+):
+    return crud.get_never_ordered_products(db)    

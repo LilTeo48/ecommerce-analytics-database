@@ -191,3 +191,35 @@ class TopCustomerResponse(BaseModel):
     last_name: str
     total_orders: int
     total_spent: Decimal
+
+# -------------------------
+# Additional analytics schemas
+# -------------------------
+
+class OrderStatusAnalyticsResponse(BaseModel):
+    order_status: str
+    total_orders: int
+    total_revenue: Decimal
+
+
+class PaymentMethodAnalyticsResponse(BaseModel):
+    payment_method: str | None
+    payment_count: int
+    total_amount: Decimal
+
+
+class ShipmentStatusAnalyticsResponse(BaseModel):
+    shipping_status: str | None
+    shipment_count: int
+
+
+class InventoryValueResponse(BaseModel):
+    total_units: int
+    total_inventory_value: Decimal
+
+
+class NeverOrderedProductResponse(BaseModel):
+    product_id: int
+    product_name: str
+    category: str | None
+    stock_quantity: int    

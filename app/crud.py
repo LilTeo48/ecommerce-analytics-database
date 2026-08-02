@@ -572,4 +572,145 @@ def get_top_customers(
             "total_spent": row.total_spent,
         }
         for row in rows
-    ]            
+    ]
+
+# -------------------------
+# Additional analytics queries
+# -------------------------
+
+def get_orders_by_status_analytics(
+    db: Session,
+) -> list[dict]:
+    total_orders = func.count(
+        models.Order.order_id
+    ).label("total_orders")
+
+    total_revenue = func.sum(
+        models.Order.total_amount
+    ).label("total_revenue")
+
+    rows = (
+        db.query(
+            models.Order.order_status,
+            total_orders,
+            total_revenue,
+        )
+        .group_by(models.Order.order_status)
+        .order_by(total_orders.desc())
+        .all()
+    )
+
+    return [
+        {
+            "order_status": row.order_status,
+            "total_orders": row.total_orders,
+            "total_revenue": row.total_revenue,
+        }
+        for row in rows
+    ]
+
+
+def get_payments_by_method_analytics(
+    db: Session,
+) -> list[dict]:
+    payment_count = func.count(
+        models.Payment.payment_id
+    ).label("payment_count")
+
+    total_amount = func.sum(
+        models.Payment.amount
+    ).label("total_amount")
+
+    rows = (
+        db.query(
+            models.Payment.payment_method,
+            payment_count,
+            total_amount,
+        )
+        .group_by(models.Payment.payment_method)
+        .order_by(total_amount.desc())
+        .all()
+    )
+
+    return [
+        {
+            "payment_method": row.payment_method,
+            "payment_count": row.payment_count,
+            "total_amount": row.total_amount,
+        }
+        for row in rows
+    ]
+
+
+def get_shipments_by_status_analytics(
+    db: Session,
+) -> list[dict]:
+    shipment_count = func.count(
+        models.Shipment.shipment_id
+    ).label("shipment_count")
+
+    rows = (
+        db.query(
+            models.Shipment.shipping_status,
+            shipment_count,
+        )
+        .group_by(models.Shipment.shipping_status)
+        .order_by(shipment_count.desc())
+        .all()
+    )
+
+    return [
+        {
+            "shipping_status": row.shipping_status,
+            "shipment_count": row.shipment_count,
+        }
+        for row in rows
+    ]
+
+
+def get_inventory_value(
+    db: Session,
+) -> dict:
+    total_units = func.coalesce(
+        func.sum(models.Product.stock_quantity),
+        0,
+    ).label("total_units")
+
+    total_inventory_value = func.coalesce(
+        func.sum(
+            models.Product.stock_quantity
+            * models.Product.price
+        ),
+        0,
+    ).label("total_inventory_value")
+
+    row = (
+        db.query(
+            total_units,
+            total_inventory_value,
+        )
+        .one()
+    )
+
+    return {
+        "total_units": row.total_units,
+        "total_inventory_value": row.total_inventory_value,
+    }
+
+
+def get_never_ordered_products(
+    db: Session,
+) -> list[models.Product]:
+    return (
+        db.query(models.Product)
+        .outerjoin(
+            models.OrderItem,
+            models.Product.product_id
+            == models.OrderItem.product_id,
+        )
+        .filter(
+            models.OrderItem.order_item_id.is_(None)
+        )
+        .order_by(models.Product.product_name.asc())
+        .all()
+    )

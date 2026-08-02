@@ -142,3 +142,55 @@ def delete_product(
     db.commit()
 
     return product
+
+# -------------------------
+# Order CRUD
+# -------------------------
+
+
+def create_order(
+    db: Session,
+    order: schemas.OrderCreate,
+) -> models.Order:
+    db_order = models.Order(**order.model_dump())
+
+    db.add(db_order)
+    db.commit()
+    db.refresh(db_order)
+
+    return db_order
+
+
+def get_order(
+    db: Session,
+    order_id: int,
+) -> models.Order | None:
+    return (
+        db.query(models.Order)
+        .filter(models.Order.order_id == order_id)
+        .first()
+    )
+
+
+def get_orders(
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+) -> list[models.Order]:
+    return (
+        db.query(models.Order)
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+
+def get_orders_by_customer(
+    db: Session,
+    customer_id: int,
+) -> list[models.Order]:
+    return (
+        db.query(models.Order)
+        .filter(models.Order.customer_id == customer_id)
+        .all()
+    )

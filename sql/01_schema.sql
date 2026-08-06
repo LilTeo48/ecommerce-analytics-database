@@ -4,6 +4,17 @@ DROP TABLE IF EXISTS order_items CASCADE;
 DROP TABLE IF EXISTS orders CASCADE;
 DROP TABLE IF EXISTS products CASCADE;
 DROP TABLE IF EXISTS customers CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+
+
+CREATE TABLE users (
+    user_id SERIAL PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    hashed_password VARCHAR(255) NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 
 CREATE TABLE customers (
     customer_id SERIAL PRIMARY KEY,
@@ -15,6 +26,7 @@ CREATE TABLE customers (
     signup_date DATE NOT NULL
 );
 
+
 CREATE TABLE products (
     product_id SERIAL PRIMARY KEY,
     product_name VARCHAR(100) NOT NULL,
@@ -22,6 +34,7 @@ CREATE TABLE products (
     price DECIMAL(10,2) NOT NULL CHECK (price >= 0),
     stock_quantity INT NOT NULL CHECK (stock_quantity >= 0)
 );
+
 
 CREATE TABLE orders (
     order_id SERIAL PRIMARY KEY,
@@ -31,6 +44,7 @@ CREATE TABLE orders (
     total_amount DECIMAL(10,2) NOT NULL CHECK (total_amount >= 0)
 );
 
+
 CREATE TABLE order_items (
     order_item_id SERIAL PRIMARY KEY,
     order_id INT NOT NULL REFERENCES orders(order_id),
@@ -38,6 +52,7 @@ CREATE TABLE order_items (
     quantity INT NOT NULL CHECK (quantity > 0),
     unit_price DECIMAL(10,2) NOT NULL CHECK (unit_price >= 0)
 );
+
 
 CREATE TABLE payments (
     payment_id SERIAL PRIMARY KEY,
@@ -47,6 +62,7 @@ CREATE TABLE payments (
     amount DECIMAL(10,2) NOT NULL CHECK (amount >= 0)
 );
 
+
 CREATE TABLE shipments (
     shipment_id SERIAL PRIMARY KEY,
     order_id INT NOT NULL UNIQUE REFERENCES orders(order_id),
@@ -54,4 +70,3 @@ CREATE TABLE shipments (
     delivery_date DATE,
     shipping_status VARCHAR(50)
 );
-

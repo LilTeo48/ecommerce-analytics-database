@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from sqlalchemy import text
 
+from app import auth
 from app.database import SessionLocal
 from app.routers import analytics, customers, inventory, orders, payments, products, shipments
 
@@ -16,6 +17,7 @@ app.include_router(payments.router)
 app.include_router(shipments.router)
 app.include_router(inventory.router)
 app.include_router(analytics.router)
+app.include_router(auth.router)
 
 
 @app.get("/")

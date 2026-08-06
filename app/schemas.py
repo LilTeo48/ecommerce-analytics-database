@@ -7,6 +7,7 @@ from pydantic import (
     EmailStr,
     Field,
     field_validator,
+   
 )
 
 
@@ -238,3 +239,29 @@ class NeverOrderedProductResponse(BaseModel):
     product_name: str
     category: str | None
     stock_quantity: int    
+
+# -------------------------
+# Authentication schemas
+# -------------------------
+
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+
+
+class UserResponse(BaseModel):
+    user_id: int
+    email: EmailStr
+    is_active: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str   

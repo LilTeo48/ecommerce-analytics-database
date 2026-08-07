@@ -3,6 +3,9 @@ from sqlalchemy.orm import Session
 
 from app import crud, schemas
 from app.database import get_db
+from app.models import User
+from app.security import get_current_user
+
 
 router = APIRouter(
     prefix="/products",
@@ -18,6 +21,7 @@ router = APIRouter(
 def create_product(
     product: schemas.ProductCreate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     return crud.create_product(db, product)
 
@@ -30,6 +34,7 @@ def get_products(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=100),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     return crud.get_products(db, skip=skip, limit=limit)
 
@@ -41,6 +46,7 @@ def get_products(
 def get_product(
     product_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     product = crud.get_product(db, product_id)
 
@@ -61,6 +67,7 @@ def update_product_stock(
     product_id: int,
     stock_quantity: int = Query(ge=0),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     product = crud.update_product_stock(
         db,
@@ -84,6 +91,7 @@ def update_product_stock(
 def delete_product(
     product_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     product = crud.delete_product(db, product_id)
 

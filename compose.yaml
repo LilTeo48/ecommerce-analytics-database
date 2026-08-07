@@ -31,6 +31,9 @@ services:
     container_name: ecommerce-api
     restart: unless-stopped
 
+    env_file:
+      - .env
+
     environment:
       DATABASE_URL: postgresql+psycopg2://postgres:postgres@db:5432/ecommerce_analytics
 

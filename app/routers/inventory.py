@@ -3,6 +3,9 @@ from sqlalchemy.orm import Session
 
 from app import crud, schemas
 from app.database import get_db
+from app.models import User
+from app.security import get_current_user
+
 
 router = APIRouter(
     prefix="/inventory",
@@ -18,6 +21,7 @@ def get_inventory(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=100),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     return crud.get_inventory(db, skip=skip, limit=limit)
 
@@ -29,6 +33,7 @@ def get_inventory(
 def get_low_stock_products(
     threshold: int = Query(default=10, ge=0),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     return crud.get_low_stock_products(db, threshold=threshold)
 
@@ -40,6 +45,7 @@ def get_low_stock_products(
 def get_product_inventory(
     product_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     product = crud.get_product(db, product_id)
 
@@ -60,6 +66,7 @@ def set_product_stock(
     product_id: int,
     stock_update: schemas.StockUpdate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     product = crud.set_product_stock(
         db,
@@ -84,6 +91,7 @@ def adjust_product_stock(
     product_id: int,
     stock_adjustment: schemas.StockAdjustment,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     try:
         product = crud.adjust_product_stock(

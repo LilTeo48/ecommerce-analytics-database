@@ -3,6 +3,9 @@ from sqlalchemy.orm import Session
 
 from app import crud, schemas
 from app.database import get_db
+from app.models import User
+from app.security import get_current_user
+
 
 router = APIRouter(
     prefix="/analytics",
@@ -16,6 +19,7 @@ router = APIRouter(
 )
 def revenue_summary(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     return crud.get_revenue_summary(db)
 
@@ -26,6 +30,7 @@ def revenue_summary(
 )
 def monthly_revenue(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     return crud.get_monthly_revenue(db)
 
@@ -36,6 +41,7 @@ def monthly_revenue(
 )
 def revenue_by_category(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     return crud.get_revenue_by_category(db)
 
@@ -47,6 +53,7 @@ def revenue_by_category(
 def top_selling_products(
     limit: int = Query(default=5, ge=1, le=100),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     return crud.get_top_selling_products(db, limit=limit)
 
@@ -58,8 +65,15 @@ def top_selling_products(
 def top_customers(
     limit: int = Query(default=5, ge=1, le=100),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     return crud.get_top_customers(db, limit=limit)
+
+
+# -------------------------
+# Additional Analytics
+# -------------------------
+
 
 @router.get(
     "/orders/by-status",
@@ -67,6 +81,7 @@ def top_customers(
 )
 def orders_by_status(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     return crud.get_orders_by_status_analytics(db)
 
@@ -77,6 +92,7 @@ def orders_by_status(
 )
 def payments_by_method(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     return crud.get_payments_by_method_analytics(db)
 
@@ -87,6 +103,7 @@ def payments_by_method(
 )
 def shipments_by_status(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     return crud.get_shipments_by_status_analytics(db)
 
@@ -97,6 +114,7 @@ def shipments_by_status(
 )
 def inventory_value(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     return crud.get_inventory_value(db)
 
@@ -107,5 +125,6 @@ def inventory_value(
 )
 def never_ordered_products(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    return crud.get_never_ordered_products(db)    
+    return crud.get_never_ordered_products(db)

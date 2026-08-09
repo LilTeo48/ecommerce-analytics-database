@@ -3,6 +3,9 @@ from sqlalchemy.orm import Session
 
 from app import crud, schemas
 from app.database import get_db
+from app.models import User
+from app.security import get_current_user
+
 
 router = APIRouter(
     prefix="/payments",
@@ -18,6 +21,7 @@ router = APIRouter(
 def create_payment(
     payment: schemas.PaymentCreate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     order = crud.get_order(db, payment.order_id)
 
@@ -49,6 +53,7 @@ def get_payments(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=100),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     return crud.get_payments(db, skip=skip, limit=limit)
 
@@ -60,6 +65,7 @@ def get_payments(
 def get_payment_by_order(
     order_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     order = crud.get_order(db, order_id)
 
@@ -87,6 +93,7 @@ def get_payment_by_order(
 def get_payment(
     payment_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     payment = crud.get_payment(db, payment_id)
 
@@ -106,6 +113,7 @@ def get_payment(
 def delete_payment(
     payment_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     payment = crud.delete_payment(db, payment_id)
 

@@ -1,12 +1,5 @@
-from fastapi.testclient import TestClient
-
-from app.main import app
-
-client = TestClient(app)
-
-
-def test_get_orders() -> None:
-    response = client.get("/orders/")
+def test_get_orders(authenticated_client) -> None:
+    response = authenticated_client.get("/orders/")
 
     assert response.status_code == 200
 
@@ -22,8 +15,8 @@ def test_get_orders() -> None:
         assert "total_amount" in order
 
 
-def test_get_orders_with_pagination() -> None:
-    response = client.get(
+def test_get_orders_with_pagination(authenticated_client) -> None:
+    response = authenticated_client.get(
         "/orders/",
         params={
             "skip": 0,
@@ -39,8 +32,8 @@ def test_get_orders_with_pagination() -> None:
     assert len(orders) <= 2
 
 
-def test_get_existing_order() -> None:
-    orders_response = client.get("/orders/")
+def test_get_existing_order(authenticated_client) -> None:
+    orders_response = authenticated_client.get("/orders/")
 
     assert orders_response.status_code == 200
 
@@ -51,7 +44,9 @@ def test_get_existing_order() -> None:
 
     order_id = orders[0]["order_id"]
 
-    response = client.get(f"/orders/{order_id}")
+    response = authenticated_client.get(
+        f"/orders/{order_id}"
+    )
 
     assert response.status_code == 200
 
@@ -63,8 +58,10 @@ def test_get_existing_order() -> None:
     assert "total_amount" in order
 
 
-def test_get_missing_order() -> None:
-    response = client.get("/orders/999999")
+def test_get_missing_order(authenticated_client) -> None:
+    response = authenticated_client.get(
+        "/orders/999999"
+    )
 
     assert response.status_code == 404
     assert response.json() == {
@@ -72,8 +69,10 @@ def test_get_missing_order() -> None:
     }
 
 
-def test_invalid_order_pagination() -> None:
-    response = client.get(
+def test_invalid_order_pagination(
+    authenticated_client,
+) -> None:
+    response = authenticated_client.get(
         "/orders/",
         params={
             "skip": -1,

@@ -1,12 +1,5 @@
-from fastapi.testclient import TestClient
-
-from app.main import app
-
-client = TestClient(app)
-
-
-def test_revenue_summary() -> None:
-    response = client.get("/analytics/revenue/summary")
+def test_revenue_summary(authenticated_client) -> None:
+    response = authenticated_client.get("/analytics/revenue/summary")
 
     assert response.status_code == 200
 
@@ -21,8 +14,8 @@ def test_revenue_summary() -> None:
     assert summary["total_orders"] >= 0
 
 
-def test_monthly_revenue() -> None:
-    response = client.get("/analytics/revenue/monthly")
+def test_monthly_revenue(authenticated_client) -> None:
+    response = authenticated_client.get("/analytics/revenue/monthly")
 
     assert response.status_code == 200
 
@@ -36,8 +29,8 @@ def test_monthly_revenue() -> None:
         assert float(item["revenue"]) >= 0
 
 
-def test_revenue_by_category() -> None:
-    response = client.get("/analytics/revenue/by-category")
+def test_revenue_by_category(authenticated_client) -> None:
+    response = authenticated_client.get("/analytics/revenue/by-category")
 
     assert response.status_code == 200
 
@@ -51,8 +44,8 @@ def test_revenue_by_category() -> None:
         assert float(item["revenue"]) >= 0
 
 
-def test_top_selling_products() -> None:
-    response = client.get(
+def test_top_selling_products(authenticated_client) -> None:
+    response = authenticated_client.get(
         "/analytics/products/top-selling",
         params={"limit": 5},
     )
@@ -75,8 +68,8 @@ def test_top_selling_products() -> None:
         assert float(product["revenue"]) >= 0
 
 
-def test_top_customers() -> None:
-    response = client.get(
+def test_top_customers(authenticated_client) -> None:
+    response = authenticated_client.get(
         "/analytics/customers/top",
         params={"limit": 5},
     )
@@ -100,8 +93,8 @@ def test_top_customers() -> None:
         assert float(customer["total_spent"]) >= 0
 
 
-def test_orders_by_status() -> None:
-    response = client.get("/analytics/orders/by-status")
+def test_orders_by_status(authenticated_client) -> None:
+    response = authenticated_client.get("/analytics/orders/by-status")
 
     assert response.status_code == 200
 
@@ -118,8 +111,8 @@ def test_orders_by_status() -> None:
         assert float(item["total_revenue"]) >= 0
 
 
-def test_payments_by_method() -> None:
-    response = client.get("/analytics/payments/by-method")
+def test_payments_by_method(authenticated_client) -> None:
+    response = authenticated_client.get("/analytics/payments/by-method")
 
     assert response.status_code == 200
 
@@ -136,8 +129,8 @@ def test_payments_by_method() -> None:
         assert float(item["total_amount"]) >= 0
 
 
-def test_shipments_by_status() -> None:
-    response = client.get("/analytics/shipments/by-status")
+def test_shipments_by_status(authenticated_client) -> None:
+    response = authenticated_client.get("/analytics/shipments/by-status")
 
     assert response.status_code == 200
 
@@ -151,8 +144,8 @@ def test_shipments_by_status() -> None:
         assert item["shipment_count"] >= 0
 
 
-def test_inventory_value() -> None:
-    response = client.get("/analytics/inventory/value")
+def test_inventory_value(authenticated_client) -> None:
+    response = authenticated_client.get("/analytics/inventory/value")
 
     assert response.status_code == 200
 
@@ -165,8 +158,10 @@ def test_inventory_value() -> None:
     assert float(inventory["total_inventory_value"]) >= 0
 
 
-def test_never_ordered_products() -> None:
-    response = client.get("/analytics/products/never-ordered")
+def test_never_ordered_products(authenticated_client) -> None:
+    response = authenticated_client.get(
+        "/analytics/products/never-ordered"
+    )
 
     assert response.status_code == 200
 
@@ -184,8 +179,8 @@ def test_never_ordered_products() -> None:
         assert product["stock_quantity"] >= 0
 
 
-def test_invalid_top_products_limit() -> None:
-    response = client.get(
+def test_invalid_top_products_limit(authenticated_client) -> None:
+    response = authenticated_client.get(
         "/analytics/products/top-selling",
         params={"limit": 101},
     )
@@ -193,8 +188,8 @@ def test_invalid_top_products_limit() -> None:
     assert response.status_code == 422
 
 
-def test_invalid_top_customers_limit() -> None:
-    response = client.get(
+def test_invalid_top_customers_limit(authenticated_client) -> None:
+    response = authenticated_client.get(
         "/analytics/customers/top",
         params={"limit": 0},
     )

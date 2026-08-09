@@ -1,12 +1,5 @@
-from fastapi.testclient import TestClient
-
-from app.main import app
-
-client = TestClient(app)
-
-
-def test_get_shipments() -> None:
-    response = client.get("/shipments/")
+def test_get_shipments(authenticated_client) -> None:
+    response = authenticated_client.get("/shipments/")
 
     assert response.status_code == 200
 
@@ -22,8 +15,8 @@ def test_get_shipments() -> None:
         assert "shipping_status" in shipment
 
 
-def test_get_shipments_with_pagination() -> None:
-    response = client.get(
+def test_get_shipments_with_pagination(authenticated_client) -> None:
+    response = authenticated_client.get(
         "/shipments/",
         params={
             "skip": 0,
@@ -39,8 +32,8 @@ def test_get_shipments_with_pagination() -> None:
     assert len(shipments) <= 2
 
 
-def test_get_existing_shipment() -> None:
-    shipments_response = client.get("/shipments/")
+def test_get_existing_shipment(authenticated_client) -> None:
+    shipments_response = authenticated_client.get("/shipments/")
 
     assert shipments_response.status_code == 200
 
@@ -51,7 +44,9 @@ def test_get_existing_shipment() -> None:
 
     shipment_id = shipments[0]["shipment_id"]
 
-    response = client.get(f"/shipments/{shipment_id}")
+    response = authenticated_client.get(
+        f"/shipments/{shipment_id}"
+    )
 
     assert response.status_code == 200
 
@@ -62,8 +57,8 @@ def test_get_existing_shipment() -> None:
     assert "shipping_status" in shipment
 
 
-def test_get_shipment_by_order() -> None:
-    shipments_response = client.get("/shipments/")
+def test_get_shipment_by_order(authenticated_client) -> None:
+    shipments_response = authenticated_client.get("/shipments/")
 
     assert shipments_response.status_code == 200
 
@@ -74,7 +69,9 @@ def test_get_shipment_by_order() -> None:
 
     order_id = shipments[0]["order_id"]
 
-    response = client.get(f"/shipments/order/{order_id}")
+    response = authenticated_client.get(
+        f"/shipments/order/{order_id}"
+    )
 
     assert response.status_code == 200
 
@@ -85,8 +82,10 @@ def test_get_shipment_by_order() -> None:
     assert "shipping_status" in shipment
 
 
-def test_get_missing_shipment() -> None:
-    response = client.get("/shipments/999999")
+def test_get_missing_shipment(authenticated_client) -> None:
+    response = authenticated_client.get(
+        "/shipments/999999"
+    )
 
     assert response.status_code == 404
     assert response.json() == {
@@ -94,8 +93,8 @@ def test_get_missing_shipment() -> None:
     }
 
 
-def test_invalid_shipment_pagination() -> None:
-    response = client.get(
+def test_invalid_shipment_pagination(authenticated_client) -> None:
+    response = authenticated_client.get(
         "/shipments/",
         params={
             "skip": -1,

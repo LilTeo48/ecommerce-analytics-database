@@ -3,6 +3,9 @@ from sqlalchemy.orm import Session
 
 from app import crud, schemas
 from app.database import get_db
+from app.models import User
+from app.security import get_current_user
+
 
 router = APIRouter(
     prefix="/shipments",
@@ -18,6 +21,7 @@ router = APIRouter(
 def create_shipment(
     shipment: schemas.ShipmentCreate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     order = crud.get_order(db, shipment.order_id)
 
@@ -49,6 +53,7 @@ def get_shipments(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=100),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     return crud.get_shipments(db, skip=skip, limit=limit)
 
@@ -60,6 +65,7 @@ def get_shipments(
 def get_shipment_by_order(
     order_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     order = crud.get_order(db, order_id)
 
@@ -87,6 +93,7 @@ def get_shipment_by_order(
 def get_shipment(
     shipment_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     shipment = crud.get_shipment(db, shipment_id)
 
@@ -107,6 +114,7 @@ def update_shipment_status(
     shipment_id: int,
     shipping_status: str = Query(min_length=1, max_length=50),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     shipment = crud.update_shipment_status(
         db,
@@ -130,6 +138,7 @@ def update_shipment_status(
 def delete_shipment(
     shipment_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     shipment = crud.delete_shipment(db, shipment_id)
 

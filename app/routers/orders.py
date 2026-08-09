@@ -3,6 +3,9 @@ from sqlalchemy.orm import Session
 
 from app import crud, schemas
 from app.database import get_db
+from app.models import User
+from app.security import get_current_user
+
 
 router = APIRouter(
     prefix="/orders",
@@ -18,6 +21,7 @@ router = APIRouter(
 def create_order(
     order: schemas.OrderCreate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     customer = crud.get_customer(db, order.customer_id)
 
@@ -38,6 +42,7 @@ def get_orders(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=100),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     return crud.get_orders(db, skip=skip, limit=limit)
 
@@ -49,6 +54,7 @@ def get_orders(
 def get_customer_orders(
     customer_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     customer = crud.get_customer(db, customer_id)
 
@@ -68,6 +74,7 @@ def get_customer_orders(
 def get_order(
     order_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     order = crud.get_order(db, order_id)
 

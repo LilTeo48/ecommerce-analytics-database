@@ -1,12 +1,5 @@
-from fastapi.testclient import TestClient
-
-from app.main import app
-
-client = TestClient(app)
-
-
-def test_get_products() -> None:
-    response = client.get("/products/")
+def test_get_products(authenticated_client) -> None:
+    response = authenticated_client.get("/products/")
 
     assert response.status_code == 200
 
@@ -22,8 +15,8 @@ def test_get_products() -> None:
         assert "stock_quantity" in product
 
 
-def test_get_products_with_pagination() -> None:
-    response = client.get(
+def test_get_products_with_pagination(authenticated_client) -> None:
+    response = authenticated_client.get(
         "/products/",
         params={
             "skip": 0,
@@ -39,8 +32,8 @@ def test_get_products_with_pagination() -> None:
     assert len(products) <= 2
 
 
-def test_get_existing_product() -> None:
-    products_response = client.get("/products/")
+def test_get_existing_product(authenticated_client) -> None:
+    products_response = authenticated_client.get("/products/")
 
     assert products_response.status_code == 200
 
@@ -51,7 +44,9 @@ def test_get_existing_product() -> None:
 
     product_id = products[0]["product_id"]
 
-    response = client.get(f"/products/{product_id}")
+    response = authenticated_client.get(
+        f"/products/{product_id}"
+    )
 
     assert response.status_code == 200
 
@@ -63,8 +58,10 @@ def test_get_existing_product() -> None:
     assert "stock_quantity" in product
 
 
-def test_get_missing_product() -> None:
-    response = client.get("/products/999999")
+def test_get_missing_product(authenticated_client) -> None:
+    response = authenticated_client.get(
+        "/products/999999"
+    )
 
     assert response.status_code == 404
     assert response.json() == {
@@ -72,8 +69,10 @@ def test_get_missing_product() -> None:
     }
 
 
-def test_invalid_product_pagination() -> None:
-    response = client.get(
+def test_invalid_product_pagination(
+    authenticated_client,
+) -> None:
+    response = authenticated_client.get(
         "/products/",
         params={
             "skip": -1,

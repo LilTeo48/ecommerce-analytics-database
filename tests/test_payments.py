@@ -1,12 +1,5 @@
-from fastapi.testclient import TestClient
-
-from app.main import app
-
-client = TestClient(app)
-
-
-def test_get_payments() -> None:
-    response = client.get("/payments/")
+def test_get_payments(authenticated_client) -> None:
+    response = authenticated_client.get("/payments/")
 
     assert response.status_code == 200
 
@@ -22,8 +15,8 @@ def test_get_payments() -> None:
         assert "amount" in payment
 
 
-def test_get_payments_with_pagination() -> None:
-    response = client.get(
+def test_get_payments_with_pagination(authenticated_client) -> None:
+    response = authenticated_client.get(
         "/payments/",
         params={
             "skip": 0,
@@ -39,8 +32,8 @@ def test_get_payments_with_pagination() -> None:
     assert len(payments) <= 2
 
 
-def test_get_existing_payment() -> None:
-    payments_response = client.get("/payments/")
+def test_get_existing_payment(authenticated_client) -> None:
+    payments_response = authenticated_client.get("/payments/")
 
     assert payments_response.status_code == 200
 
@@ -51,7 +44,9 @@ def test_get_existing_payment() -> None:
 
     payment_id = payments[0]["payment_id"]
 
-    response = client.get(f"/payments/{payment_id}")
+    response = authenticated_client.get(
+        f"/payments/{payment_id}"
+    )
 
     assert response.status_code == 200
 
@@ -64,8 +59,8 @@ def test_get_existing_payment() -> None:
     assert "amount" in payment
 
 
-def test_get_payment_by_order() -> None:
-    payments_response = client.get("/payments/")
+def test_get_payment_by_order(authenticated_client) -> None:
+    payments_response = authenticated_client.get("/payments/")
 
     assert payments_response.status_code == 200
 
@@ -76,7 +71,9 @@ def test_get_payment_by_order() -> None:
 
     order_id = payments[0]["order_id"]
 
-    response = client.get(f"/payments/order/{order_id}")
+    response = authenticated_client.get(
+        f"/payments/order/{order_id}"
+    )
 
     assert response.status_code == 200
 
@@ -87,8 +84,10 @@ def test_get_payment_by_order() -> None:
     assert "amount" in payment
 
 
-def test_get_missing_payment() -> None:
-    response = client.get("/payments/999999")
+def test_get_missing_payment(authenticated_client) -> None:
+    response = authenticated_client.get(
+        "/payments/999999"
+    )
 
     assert response.status_code == 404
     assert response.json() == {
@@ -96,8 +95,10 @@ def test_get_missing_payment() -> None:
     }
 
 
-def test_invalid_payment_pagination() -> None:
-    response = client.get(
+def test_invalid_payment_pagination(
+    authenticated_client,
+) -> None:
+    response = authenticated_client.get(
         "/payments/",
         params={
             "skip": -1,

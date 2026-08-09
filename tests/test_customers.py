@@ -1,12 +1,5 @@
-from fastapi.testclient import TestClient
-
-from app.main import app
-
-client = TestClient(app)
-
-
-def test_get_customers() -> None:
-    response = client.get("/customers/")
+def test_get_customers(authenticated_client) -> None:
+    response = authenticated_client.get("/customers/")
 
     assert response.status_code == 200
 
@@ -22,8 +15,8 @@ def test_get_customers() -> None:
         assert "signup_date" in customer
 
 
-def test_get_customers_with_pagination() -> None:
-    response = client.get(
+def test_get_customers_with_pagination(authenticated_client) -> None:
+    response = authenticated_client.get(
         "/customers/",
         params={
             "skip": 0,
@@ -39,8 +32,8 @@ def test_get_customers_with_pagination() -> None:
     assert len(customers) <= 2
 
 
-def test_get_existing_customer() -> None:
-    customers_response = client.get("/customers/")
+def test_get_existing_customer(authenticated_client) -> None:
+    customers_response = authenticated_client.get("/customers/")
 
     assert customers_response.status_code == 200
 
@@ -51,7 +44,9 @@ def test_get_existing_customer() -> None:
 
     customer_id = customers[0]["customer_id"]
 
-    response = client.get(f"/customers/{customer_id}")
+    response = authenticated_client.get(
+        f"/customers/{customer_id}"
+    )
 
     assert response.status_code == 200
 
@@ -61,8 +56,10 @@ def test_get_existing_customer() -> None:
     assert "email" in customer
 
 
-def test_get_missing_customer() -> None:
-    response = client.get("/customers/999999")
+def test_get_missing_customer(authenticated_client) -> None:
+    response = authenticated_client.get(
+        "/customers/999999"
+    )
 
     assert response.status_code == 404
     assert response.json() == {
@@ -70,8 +67,10 @@ def test_get_missing_customer() -> None:
     }
 
 
-def test_invalid_customer_pagination() -> None:
-    response = client.get(
+def test_invalid_customer_pagination(
+    authenticated_client,
+) -> None:
+    response = authenticated_client.get(
         "/customers/",
         params={
             "skip": -1,

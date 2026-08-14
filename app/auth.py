@@ -383,3 +383,30 @@ def change_password(
     return {
         "detail": "Password changed successfully.",
     }
+
+
+@router.post(
+    "/logout-all",
+    status_code=status.HTTP_200_OK,
+)
+def logout_all_sessions(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    active_refresh_tokens = db.scalars(
+        select(RefreshToken).where(
+            RefreshToken.user_id == current_user.user_id,
+            RefreshToken.revoked_at.is_(None),
+        )
+    ).all()
+
+    revoked_at = utc_now_naive()
+
+    for refresh_token in active_refresh_tokens:
+        refresh_token.revoked_at = revoked_at
+
+    db.commit()
+
+    return {
+        "detail": "All sessions logged out successfully.",
+    }

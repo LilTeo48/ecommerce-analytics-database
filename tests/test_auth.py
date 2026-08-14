@@ -811,4 +811,130 @@ def test_change_password_revokes_existing_refresh_tokens():
     assert refresh_response.status_code == 401
     assert refresh_response.json() == {
         "detail": "Refresh token has been revoked.",
-    }        
+    }
+
+def test_logout_all_requires_authentication():
+    response = client.post(
+        "/auth/logout-all"
+    )
+
+    assert response.status_code == 401
+
+
+def test_logout_all_revokes_multiple_refresh_tokens():
+    email = f"pytest_logout_all_{uuid4().hex}@example.com"
+    password = "Password123!"
+
+    register_response = client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert register_response.status_code == 201
+
+    first_login = client.post(
+        "/auth/login",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    second_login = client.post(
+        "/auth/login",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert first_login.status_code == 200
+    assert second_login.status_code == 200
+
+    first_access_token = (
+        first_login.json()["access_token"]
+    )
+    first_refresh_token = (
+        first_login.json()["refresh_token"]
+    )
+    second_refresh_token = (
+        second_login.json()["refresh_token"]
+    )
+
+    logout_all_response = client.post(
+        "/auth/logout-all",
+        headers={
+            "Authorization": f"Bearer {first_access_token}"
+        },
+    )
+
+    assert logout_all_response.status_code == 200
+    assert logout_all_response.json() == {
+        "detail": "All sessions logged out successfully.",
+    }
+
+    first_refresh_response = client.post(
+        "/auth/refresh",
+        json={
+            "refresh_token": first_refresh_token,
+        },
+    )
+
+    second_refresh_response = client.post(
+        "/auth/refresh",
+        json={
+            "refresh_token": second_refresh_token,
+        },
+    )
+
+    assert first_refresh_response.status_code == 401
+    assert second_refresh_response.status_code == 401
+
+
+def test_fresh_login_works_after_logout_all():
+    email = f"pytest_logout_all_login_{uuid4().hex}@example.com"
+    password = "Password123!"
+
+    client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    login_response = client.post(
+        "/auth/login",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    logout_all_response = client.post(
+        "/auth/logout-all",
+        headers={
+            "Authorization": f"Bearer {access_token}"
+        },
+    )
+
+    assert logout_all_response.status_code == 200
+
+    fresh_login_response = client.post(
+        "/auth/login",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert fresh_login_response.status_code == 200
+    assert "access_token" in fresh_login_response.json()
+    assert "refresh_token" in fresh_login_response.json()        

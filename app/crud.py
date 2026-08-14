@@ -1,4 +1,6 @@
-from sqlalchemy import func
+from decimal import Decimal
+
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app import models, schemas
@@ -149,17 +151,131 @@ def delete_product(
 # -------------------------
 
 
+class OrderCreationError(Exception):
+    """Base exception for transactional order creation."""
+
+
+class CustomerNotFoundError(OrderCreationError):
+    def __init__(self, customer_id: int):
+        self.customer_id = customer_id
+        super().__init__(
+            f"Customer {customer_id} not found."
+        )
+
+
+class ProductNotFoundError(OrderCreationError):
+    def __init__(self, product_id: int):
+        self.product_id = product_id
+        super().__init__(
+            f"Product {product_id} not found."
+        )
+
+
+class InsufficientStockError(OrderCreationError):
+    def __init__(
+        self,
+        product_id: int,
+        requested: int,
+        available: int,
+    ):
+        self.product_id = product_id
+        self.requested = requested
+        self.available = available
+
+        super().__init__(
+            f"Insufficient stock for product {product_id}. "
+            f"Requested {requested}, available {available}."
+        )
+
+
 def create_order(
     db: Session,
     order: schemas.OrderCreate,
 ) -> models.Order:
-    db_order = models.Order(**order.model_dump())
+    try:
+        customer = db.get(
+            models.Customer,
+            order.customer_id,
+        )
 
-    db.add(db_order)
-    db.commit()
-    db.refresh(db_order)
+        if customer is None:
+            raise CustomerNotFoundError(
+                order.customer_id
+            )
 
-    return db_order
+        validated_items: list[
+            tuple[schemas.OrderItemCreate, models.Product]
+        ] = []
+
+        total_amount = Decimal("0.00")
+
+        for item in order.items:
+            product = db.scalar(
+                select(models.Product)
+                .where(
+                    models.Product.product_id
+                    == item.product_id
+                )
+                .with_for_update()
+            )
+
+            if product is None:
+                raise ProductNotFoundError(
+                    item.product_id
+                )
+
+            if product.stock_quantity < item.quantity:
+                raise InsufficientStockError(
+                    product_id=product.product_id,
+                    requested=item.quantity,
+                    available=product.stock_quantity,
+                )
+
+            total_amount += (
+                product.price * item.quantity
+            )
+
+            validated_items.append(
+                (item, product)
+            )
+
+        db_order = models.Order(
+            customer_id=order.customer_id,
+            order_date=order.order_date,
+            order_status=order.order_status,
+            total_amount=total_amount,
+        )
+
+        db.add(db_order)
+
+        # Flush gives us order_id without committing.
+        db.flush()
+
+        for item, product in validated_items:
+            db_order_item = models.OrderItem(
+                order_id=db_order.order_id,
+                product_id=product.product_id,
+                quantity=item.quantity,
+                unit_price=product.price,
+            )
+
+            db.add(db_order_item)
+
+            product.stock_quantity -= item.quantity
+
+        # One commit for:
+        # - order
+        # - order items
+        # - inventory changes
+        db.commit()
+
+        db.refresh(db_order)
+
+        return db_order
+
+    except Exception:
+        db.rollback()
+        raise
 
 
 def get_order(
@@ -192,7 +308,9 @@ def get_orders_by_customer(
 ) -> list[models.Order]:
     return (
         db.query(models.Order)
-        .filter(models.Order.customer_id == customer_id)
+        .filter(
+            models.Order.customer_id == customer_id
+        )
         .all()
     )
 

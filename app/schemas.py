@@ -7,7 +7,6 @@ from pydantic import (
     EmailStr,
     Field,
     field_validator,
-   
 )
 
 
@@ -59,19 +58,17 @@ class ProductResponse(ProductBase):
 # Order item schemas
 # -------------------------
 
-class OrderItemBase(BaseModel):
+class OrderItemCreate(BaseModel):
     product_id: int = Field(gt=0)
     quantity: int = Field(gt=0)
-    unit_price: Decimal = Field(ge=0, decimal_places=2)
 
 
-class OrderItemCreate(OrderItemBase):
-    pass
-
-
-class OrderItemResponse(OrderItemBase):
+class OrderItemResponse(BaseModel):
     order_item_id: int
     order_id: int
+    product_id: int
+    quantity: int
+    unit_price: Decimal
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -87,8 +84,29 @@ class OrderBase(BaseModel):
     total_amount: Decimal = Field(ge=0, decimal_places=2)
 
 
-class OrderCreate(OrderBase):
-    pass
+class OrderCreate(BaseModel):
+    customer_id: int = Field(gt=0)
+    order_date: date
+    order_status: str = Field(min_length=1, max_length=30)
+    items: list[OrderItemCreate] = Field(min_length=1)
+
+    @field_validator("items")
+    @classmethod
+    def products_must_be_unique(
+        cls,
+        items: list[OrderItemCreate],
+    ) -> list[OrderItemCreate]:
+        product_ids = [
+            item.product_id
+            for item in items
+        ]
+
+        if len(product_ids) != len(set(product_ids)):
+            raise ValueError(
+                "Each product may only appear once per order."
+            )
+
+        return items
 
 
 class OrderResponse(OrderBase):
@@ -98,7 +116,9 @@ class OrderResponse(OrderBase):
 
 
 class OrderDetailResponse(OrderResponse):
-    order_items: list[OrderItemResponse] = Field(default_factory=list)
+    order_items: list[OrderItemResponse] = Field(
+        default_factory=list
+    )
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -132,7 +152,10 @@ class ShipmentBase(BaseModel):
     order_id: int = Field(gt=0)
     shipment_date: date | None = None
     delivery_date: date | None = None
-    shipping_status: str | None = Field(default=None, max_length=50)
+    shipping_status: str | None = Field(
+        default=None,
+        max_length=50,
+    )
 
 
 class ShipmentCreate(ShipmentBase):
@@ -158,9 +181,14 @@ class StockAdjustment(BaseModel):
 
     @field_validator("adjustment")
     @classmethod
-    def adjustment_cannot_be_zero(cls, value: int) -> int:
+    def adjustment_cannot_be_zero(
+        cls,
+        value: int,
+    ) -> int:
         if value == 0:
-            raise ValueError("Adjustment cannot be zero.")
+            raise ValueError(
+                "Adjustment cannot be zero."
+            )
 
         return value
 
@@ -172,6 +200,7 @@ class InventoryResponse(BaseModel):
     stock_quantity: int
 
     model_config = ConfigDict(from_attributes=True)
+
 
 # -------------------------
 # Analytics schemas
@@ -238,7 +267,8 @@ class NeverOrderedProductResponse(BaseModel):
     product_id: int
     product_name: str
     category: str | None
-    stock_quantity: int    
+    stock_quantity: int
+
 
 # -------------------------
 # Authentication schemas
@@ -246,12 +276,18 @@ class NeverOrderedProductResponse(BaseModel):
 
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=8, max_length=128)
+    password: str = Field(
+        min_length=8,
+        max_length=128,
+    )
 
 
 class UserLogin(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=8, max_length=128)
+    password: str = Field(
+        min_length=8,
+        max_length=128,
+    )
 
 
 class UserResponse(BaseModel):

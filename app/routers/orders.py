@@ -6,6 +6,7 @@ from app.database import get_db
 from app.models import User
 from app.security import get_current_user, require_admin
 
+
 router = APIRouter(
     prefix="/orders",
     tags=["Orders"],
@@ -14,7 +15,7 @@ router = APIRouter(
 
 @router.post(
     "/",
-    response_model=schemas.OrderResponse,
+    response_model=schemas.OrderDetailResponse,
     status_code=status.HTTP_201_CREATED,
 )
 def create_order(
@@ -22,21 +23,29 @@ def create_order(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
-    customer = crud.get_customer(
-        db,
-        order.customer_id,
-    )
-
-    if customer is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Customer not found.",
+    try:
+        return crud.create_order(
+            db,
+            order,
         )
 
-    return crud.create_order(
-        db,
-        order,
-    )
+    except crud.CustomerNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+    except crud.ProductNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+    except crud.InsufficientStockError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
 
 
 @router.get(
@@ -84,7 +93,7 @@ def get_customer_orders(
 
 @router.get(
     "/{order_id}",
-    response_model=schemas.OrderResponse,
+    response_model=schemas.OrderDetailResponse,
 )
 def get_order(
     order_id: int,

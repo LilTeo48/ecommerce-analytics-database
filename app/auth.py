@@ -1,10 +1,14 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
+from jwt import InvalidTokenError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import User
+from app.models import RefreshToken, User
 from app.schemas import (
+    RefreshTokenRequest,
     Token,
     UserCreate,
     UserLogin,
@@ -12,6 +16,8 @@ from app.schemas import (
 )
 from app.security import (
     create_access_token,
+    create_refresh_token,
+    decode_token,
     hash_password,
     verify_password,
 )
@@ -21,6 +27,18 @@ router = APIRouter(
     prefix="/auth",
     tags=["Authentication"],
 )
+
+
+def utc_now_naive() -> datetime:
+    """
+    Return the current UTC time without timezone information.
+
+    PostgreSQL DateTime columns in this project use
+    timestamp without time zone.
+    """
+    return datetime.now(timezone.utc).replace(
+        tzinfo=None
+    )
 
 
 @router.post(
@@ -33,7 +51,9 @@ def register_user(
     db: Session = Depends(get_db),
 ):
     existing_user = db.scalar(
-        select(User).where(User.email == user_data.email)
+        select(User).where(
+            User.email == user_data.email
+        )
     )
 
     if existing_user is not None:
@@ -44,7 +64,9 @@ def register_user(
 
     new_user = User(
         email=user_data.email,
-        hashed_password=hash_password(user_data.password),
+        hashed_password=hash_password(
+            user_data.password
+        ),
         role="user",
         is_active=True,
     )
@@ -65,7 +87,9 @@ def login_user(
     db: Session = Depends(get_db),
 ):
     user = db.scalar(
-        select(User).where(User.email == credentials.email)
+        select(User).where(
+            User.email == credentials.email
+        )
     )
 
     if user is None or not verify_password(
@@ -75,7 +99,9 @@ def login_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password.",
-            headers={"WWW-Authenticate": "Bearer"},
+            headers={
+                "WWW-Authenticate": "Bearer",
+            },
         )
 
     if not user.is_active:
@@ -84,11 +110,222 @@ def login_user(
             detail="User account is inactive.",
         )
 
+    user.last_login_at = utc_now_naive()
+
     access_token = create_access_token(
-        data={"sub": str(user.user_id)}
+        data={
+            "sub": str(user.user_id),
+        }
     )
+
+    (
+        refresh_token,
+        refresh_jti,
+        refresh_expires_at,
+    ) = create_refresh_token(
+        data={
+            "sub": str(user.user_id),
+        }
+    )
+
+    refresh_token_record = RefreshToken(
+        user_id=user.user_id,
+        jti=refresh_jti,
+        expires_at=refresh_expires_at.replace(
+            tzinfo=None
+        ),
+    )
+
+    db.add(refresh_token_record)
+    db.commit()
 
     return {
         "access_token": access_token,
+        "refresh_token": refresh_token,
         "token_type": "bearer",
+    }
+
+
+@router.post(
+    "/refresh",
+    response_model=Token,
+)
+def refresh_access_token(
+    token_data: RefreshTokenRequest,
+    db: Session = Depends(get_db),
+):
+    try:
+        payload = decode_token(
+            token_data.refresh_token
+        )
+
+        if payload.get("type") != "refresh":
+            raise ValueError(
+                "Token is not a refresh token."
+            )
+
+        subject = payload.get("sub")
+        jti = payload.get("jti")
+
+        if subject is None or jti is None:
+            raise ValueError(
+                "Refresh token is missing required claims."
+            )
+
+        user_id = int(subject)
+
+    except (
+        InvalidTokenError,
+        ValueError,
+        TypeError,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token.",
+        )
+
+    stored_token = db.scalar(
+        select(RefreshToken).where(
+            RefreshToken.jti == jti
+        )
+    )
+
+    if stored_token is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token.",
+        )
+
+    if stored_token.user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token.",
+        )
+
+    if stored_token.revoked_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token has been revoked.",
+        )
+
+    if stored_token.expires_at <= utc_now_naive():
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token has expired.",
+        )
+
+    user = db.scalar(
+        select(User).where(
+            User.user_id == user_id
+        )
+    )
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token.",
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is inactive.",
+        )
+
+    # Revoke the refresh token that was just used.
+    stored_token.revoked_at = utc_now_naive()
+
+    access_token = create_access_token(
+        data={
+            "sub": str(user.user_id),
+        }
+    )
+
+    (
+        new_refresh_token,
+        new_refresh_jti,
+        new_refresh_expires_at,
+    ) = create_refresh_token(
+        data={
+            "sub": str(user.user_id),
+        }
+    )
+
+    new_refresh_token_record = RefreshToken(
+        user_id=user.user_id,
+        jti=new_refresh_jti,
+        expires_at=new_refresh_expires_at.replace(
+            tzinfo=None
+        ),
+    )
+
+    db.add(new_refresh_token_record)
+    db.commit()
+
+    return {
+        "access_token": access_token,
+        "refresh_token": new_refresh_token,
+        "token_type": "bearer",
+    }
+
+
+@router.post(
+    "/logout",
+    status_code=status.HTTP_200_OK,
+)
+def logout_user(
+    token_data: RefreshTokenRequest,
+    db: Session = Depends(get_db),
+):
+    try:
+        payload = decode_token(
+            token_data.refresh_token
+        )
+
+        if payload.get("type") != "refresh":
+            raise ValueError(
+                "Token is not a refresh token."
+            )
+
+        jti = payload.get("jti")
+
+        if jti is None:
+            raise ValueError(
+                "Refresh token is missing jti."
+            )
+
+    except (
+        InvalidTokenError,
+        ValueError,
+        TypeError,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token.",
+        )
+
+    stored_token = db.scalar(
+        select(RefreshToken).where(
+            RefreshToken.jti == jti
+        )
+    )
+
+    if stored_token is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token.",
+        )
+
+    if stored_token.revoked_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token has been revoked.",
+        )
+
+    stored_token.revoked_at = utc_now_naive()
+
+    db.commit()
+
+    return {
+        "detail": "Logged out successfully.",
     }

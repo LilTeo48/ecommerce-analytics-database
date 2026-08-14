@@ -937,4 +937,108 @@ def test_fresh_login_works_after_logout_all():
 
     assert fresh_login_response.status_code == 200
     assert "access_token" in fresh_login_response.json()
-    assert "refresh_token" in fresh_login_response.json()        
+    assert "refresh_token" in fresh_login_response.json()
+
+
+def test_get_current_user_requires_authentication():
+    response = client.get(
+        "/auth/me"
+    )
+
+    assert response.status_code == 401
+
+
+def test_get_current_user_with_invalid_token():
+    response = client.get(
+        "/auth/me",
+        headers={
+            "Authorization": (
+                "Bearer definitely-not-a-valid-jwt"
+            )
+        },
+    )
+
+    assert response.status_code == 401
+
+
+def test_get_current_user_returns_authenticated_user():
+    email = f"pytest_me_{uuid4().hex}@example.com"
+    password = "Password123!"
+
+    register_response = client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert register_response.status_code == 201
+
+    user_id = register_response.json()["user_id"]
+
+    login_response = client.post(
+        "/auth/login",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = (
+        login_response.json()["access_token"]
+    )
+
+    response = client.get(
+        "/auth/me",
+        headers={
+            "Authorization": f"Bearer {access_token}"
+        },
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["user_id"] == user_id
+    assert data["email"] == email
+    assert data["role"] == "user"
+    assert data["is_active"] is True
+
+
+def test_refresh_token_cannot_access_current_user():
+    email = f"pytest_me_refresh_{uuid4().hex}@example.com"
+    password = "Password123!"
+
+    client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    login_response = client.post(
+        "/auth/login",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    refresh_token = (
+        login_response.json()["refresh_token"]
+    )
+
+    response = client.get(
+        "/auth/me",
+        headers={
+            "Authorization": f"Bearer {refresh_token}"
+        },
+    )
+
+    assert response.status_code == 401       

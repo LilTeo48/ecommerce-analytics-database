@@ -410,3 +410,14 @@ def logout_all_sessions(
     return {
         "detail": "All sessions logged out successfully.",
     }
+
+
+@router.get(
+    "/me",
+    response_model=UserResponse,
+    status_code=status.HTTP_200_OK,
+)
+def get_authenticated_user(
+    current_user: User = Depends(get_current_user),
+):
+    return current_user

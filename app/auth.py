@@ -9,6 +9,7 @@ from app.database import get_db
 from app.models import RefreshToken, User
 from app.schemas import (
     ChangePasswordRequest,
+    DeactivateAccountRequest,
     RefreshTokenRequest,
     Token,
     UserCreate,
@@ -421,3 +422,41 @@ def get_authenticated_user(
     current_user: User = Depends(get_current_user),
 ):
     return current_user
+
+@router.post(
+    "/deactivate",
+    status_code=status.HTTP_200_OK,
+)
+def deactivate_account(
+    account_data: DeactivateAccountRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not verify_password(
+        account_data.password,
+        current_user.hashed_password,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password is incorrect.",
+        )
+
+    current_user.is_active = False
+
+    active_refresh_tokens = db.scalars(
+        select(RefreshToken).where(
+            RefreshToken.user_id == current_user.user_id,
+            RefreshToken.revoked_at.is_(None),
+        )
+    ).all()
+
+    revoked_at = utc_now_naive()
+
+    for refresh_token in active_refresh_tokens:
+        refresh_token.revoked_at = revoked_at
+
+    db.commit()
+
+    return {
+        "detail": "Account deactivated successfully.",
+    }    

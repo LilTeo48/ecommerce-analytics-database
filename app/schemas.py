@@ -302,7 +302,11 @@ class ChangePasswordRequest(BaseModel):
         min_length=8,
         max_length=128,
     )
-
+class DeactivateAccountRequest(BaseModel):
+    password: str = Field(
+        min_length=8,
+        max_length=128,
+    )
 
 class UserResponse(BaseModel):
     user_id: int
@@ -321,4 +325,3 @@ class Token(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str
-    

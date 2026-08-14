@@ -1041,4 +1041,264 @@ def test_refresh_token_cannot_access_current_user():
         },
     )
 
-    assert response.status_code == 401       
+    assert response.status_code == 401 
+
+def test_deactivate_account_requires_authentication() -> None:
+    response = client.post(
+        "/auth/deactivate",
+        json={
+            "password": "Password123!",
+        },
+    )
+
+    assert response.status_code == 401
+
+
+def test_deactivate_account_wrong_password() -> None:
+    email = f"pytest_deactivate_wrong_{uuid4().hex}@example.com"
+    password = "Password123!"
+
+    register_response = client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert register_response.status_code == 201
+
+    login_response = client.post(
+        "/auth/login",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.post(
+        "/auth/deactivate",
+        headers={
+            "Authorization": f"Bearer {access_token}"
+        },
+        json={
+            "password": "WrongPassword123!",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": "Password is incorrect.",
+    }
+
+
+def test_deactivate_account_success() -> None:
+    email = f"pytest_deactivate_{uuid4().hex}@example.com"
+    password = "Password123!"
+
+    register_response = client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert register_response.status_code == 201
+
+    login_response = client.post(
+        "/auth/login",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    tokens = login_response.json()
+
+    response = client.post(
+        "/auth/deactivate",
+        headers={
+            "Authorization": (
+                f"Bearer {tokens['access_token']}"
+            ),
+        },
+        json={
+            "password": password,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "detail": "Account deactivated successfully.",
+    }
+
+
+def test_deactivated_user_cannot_login() -> None:
+    email = f"pytest_deactivated_login_{uuid4().hex}@example.com"
+    password = "Password123!"
+
+    register_response = client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert register_response.status_code == 201
+
+    login_response = client.post(
+        "/auth/login",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()[
+        "access_token"
+    ]
+
+    deactivate_response = client.post(
+        "/auth/deactivate",
+        headers={
+            "Authorization": (
+                f"Bearer {access_token}"
+            ),
+        },
+        json={
+            "password": password,
+        },
+    )
+
+    assert deactivate_response.status_code == 200
+
+    second_login_response = client.post(
+        "/auth/login",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert second_login_response.status_code == 403
+    assert second_login_response.json() == {
+        "detail": "User account is inactive.",
+    }
+
+
+def test_deactivation_revokes_refresh_token() -> None:
+    email = f"pytest_deactivated_refresh_{uuid4().hex}@example.com"
+    password = "Password123!"
+
+    register_response = client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert register_response.status_code == 201
+
+    login_response = client.post(
+        "/auth/login",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    tokens = login_response.json()
+
+    deactivate_response = client.post(
+        "/auth/deactivate",
+        headers={
+            "Authorization": (
+                f"Bearer {tokens['access_token']}"
+            ),
+        },
+        json={
+            "password": password,
+        },
+    )
+
+    assert deactivate_response.status_code == 200
+
+    refresh_response = client.post(
+        "/auth/refresh",
+        json={
+            "refresh_token": tokens[
+                "refresh_token"
+            ],
+        },
+    )
+
+    assert refresh_response.status_code == 401
+    assert refresh_response.json() == {
+        "detail": "Refresh token has been revoked.",
+    }
+
+
+def test_deactivated_user_access_token_stops_working() -> None:
+    email = f"pytest_deactivated_access_{uuid4().hex}@example.com"
+    password = "Password123!"
+
+    register_response = client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert register_response.status_code == 201
+
+    login_response = client.post(
+        "/auth/login",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()[
+        "access_token"
+    ]
+
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+    }
+
+    deactivate_response = client.post(
+        "/auth/deactivate",
+        headers=headers,
+        json={
+            "password": password,
+        },
+    )
+
+    assert deactivate_response.status_code == 200
+
+    me_response = client.get(
+        "/auth/me",
+        headers=headers,
+    )
+
+    assert me_response.status_code == 403
+    assert me_response.json() == {
+        "detail": "User account is inactive.",
+    }

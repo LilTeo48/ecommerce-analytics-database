@@ -541,4 +541,274 @@ def test_revoked_refresh_token_cannot_logout_again():
         },
     )
 
-    assert second_logout_response.status_code == 401    
+    assert second_logout_response.status_code == 401
+
+def test_change_password_success():
+    email = f"pytest_change_password_{uuid4().hex}@example.com"
+    old_password = "Password123!"
+    new_password = "NewPassword123!"
+
+    register_response = client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": old_password,
+        },
+    )
+
+    assert register_response.status_code == 201
+
+    login_response = client.post(
+        "/auth/login",
+        json={
+            "email": email,
+            "password": old_password,
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.post(
+        "/auth/change-password",
+        headers={
+            "Authorization": f"Bearer {access_token}"
+        },
+        json={
+            "current_password": old_password,
+            "new_password": new_password,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "detail": "Password changed successfully.",
+    }
+
+
+def test_change_password_wrong_current_password():
+    email = f"pytest_wrong_current_{uuid4().hex}@example.com"
+    password = "Password123!"
+
+    client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    login_response = client.post(
+        "/auth/login",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.post(
+        "/auth/change-password",
+        headers={
+            "Authorization": f"Bearer {access_token}"
+        },
+        json={
+            "current_password": "WrongPassword123!",
+            "new_password": "NewPassword123!",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": "Current password is incorrect.",
+    }
+
+
+def test_change_password_rejects_same_password():
+    email = f"pytest_same_password_{uuid4().hex}@example.com"
+    password = "Password123!"
+
+    client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    login_response = client.post(
+        "/auth/login",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.post(
+        "/auth/change-password",
+        headers={
+            "Authorization": f"Bearer {access_token}"
+        },
+        json={
+            "current_password": password,
+            "new_password": password,
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": (
+            "New password must be different "
+            "from current password."
+        ),
+    }
+
+
+def test_old_password_fails_after_password_change():
+    email = f"pytest_old_password_{uuid4().hex}@example.com"
+    old_password = "Password123!"
+    new_password = "NewPassword123!"
+
+    client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": old_password,
+        },
+    )
+
+    login_response = client.post(
+        "/auth/login",
+        json={
+            "email": email,
+            "password": old_password,
+        },
+    )
+
+    access_token = login_response.json()["access_token"]
+
+    change_response = client.post(
+        "/auth/change-password",
+        headers={
+            "Authorization": f"Bearer {access_token}"
+        },
+        json={
+            "current_password": old_password,
+            "new_password": new_password,
+        },
+    )
+
+    assert change_response.status_code == 200
+
+    old_login_response = client.post(
+        "/auth/login",
+        json={
+            "email": email,
+            "password": old_password,
+        },
+    )
+
+    assert old_login_response.status_code == 401
+
+
+def test_new_password_works_after_password_change():
+    email = f"pytest_new_password_{uuid4().hex}@example.com"
+    old_password = "Password123!"
+    new_password = "NewPassword123!"
+
+    client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": old_password,
+        },
+    )
+
+    login_response = client.post(
+        "/auth/login",
+        json={
+            "email": email,
+            "password": old_password,
+        },
+    )
+
+    access_token = login_response.json()["access_token"]
+
+    change_response = client.post(
+        "/auth/change-password",
+        headers={
+            "Authorization": f"Bearer {access_token}"
+        },
+        json={
+            "current_password": old_password,
+            "new_password": new_password,
+        },
+    )
+
+    assert change_response.status_code == 200
+
+    new_login_response = client.post(
+        "/auth/login",
+        json={
+            "email": email,
+            "password": new_password,
+        },
+    )
+
+    assert new_login_response.status_code == 200
+    assert "access_token" in new_login_response.json()
+    assert "refresh_token" in new_login_response.json()
+
+
+def test_change_password_revokes_existing_refresh_tokens():
+    email = f"pytest_revoke_sessions_{uuid4().hex}@example.com"
+    old_password = "Password123!"
+    new_password = "NewPassword123!"
+
+    client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": old_password,
+        },
+    )
+
+    login_response = client.post(
+        "/auth/login",
+        json={
+            "email": email,
+            "password": old_password,
+        },
+    )
+
+    access_token = login_response.json()["access_token"]
+    refresh_token = login_response.json()["refresh_token"]
+
+    change_response = client.post(
+        "/auth/change-password",
+        headers={
+            "Authorization": f"Bearer {access_token}"
+        },
+        json={
+            "current_password": old_password,
+            "new_password": new_password,
+        },
+    )
+
+    assert change_response.status_code == 200
+
+    refresh_response = client.post(
+        "/auth/refresh",
+        json={
+            "refresh_token": refresh_token,
+        },
+    )
+
+    assert refresh_response.status_code == 401
+    assert refresh_response.json() == {
+        "detail": "Refresh token has been revoked.",
+    }        

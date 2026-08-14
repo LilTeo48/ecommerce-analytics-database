@@ -130,7 +130,10 @@ class OrderDetailResponse(OrderResponse):
 class PaymentBase(BaseModel):
     order_id: int = Field(gt=0)
     payment_date: date
-    payment_method: str | None = Field(default=None, max_length=50)
+    payment_method: str | None = Field(
+        default=None,
+        max_length=50,
+    )
     amount: Decimal = Field(ge=0, decimal_places=2)
 
 
@@ -290,6 +293,17 @@ class UserLogin(BaseModel):
     )
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(
+        min_length=8,
+        max_length=128,
+    )
+    new_password: str = Field(
+        min_length=8,
+        max_length=128,
+    )
+
+
 class UserResponse(BaseModel):
     user_id: int
     email: EmailStr
@@ -307,3 +321,4 @@ class Token(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str
+    

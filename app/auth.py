@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import RefreshToken, User
 from app.schemas import (
+    ChangePasswordRequest,
     RefreshTokenRequest,
     Token,
     UserCreate,
@@ -18,6 +19,7 @@ from app.security import (
     create_access_token,
     create_refresh_token,
     decode_token,
+    get_current_user,
     hash_password,
     verify_password,
 )
@@ -232,7 +234,6 @@ def refresh_access_token(
             detail="User account is inactive.",
         )
 
-    # Revoke the refresh token that was just used.
     stored_token.revoked_at = utc_now_naive()
 
     access_token = create_access_token(
@@ -328,4 +329,57 @@ def logout_user(
 
     return {
         "detail": "Logged out successfully.",
+    }
+
+
+@router.post(
+    "/change-password",
+    status_code=status.HTTP_200_OK,
+)
+def change_password(
+    password_data: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not verify_password(
+        password_data.current_password,
+        current_user.hashed_password,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect.",
+        )
+
+    if verify_password(
+        password_data.new_password,
+        current_user.hashed_password,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "New password must be different "
+                "from current password."
+            ),
+        )
+
+    current_user.hashed_password = hash_password(
+        password_data.new_password
+    )
+
+    active_refresh_tokens = db.scalars(
+        select(RefreshToken).where(
+            RefreshToken.user_id == current_user.user_id,
+            RefreshToken.revoked_at.is_(None),
+        )
+    ).all()
+
+    revoked_at = utc_now_naive()
+
+    for refresh_token in active_refresh_tokens:
+        refresh_token.revoked_at = revoked_at
+
+    db.commit()
+
+    return {
+        "detail": "Password changed successfully.",
     }

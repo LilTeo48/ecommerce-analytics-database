@@ -107,3 +107,86 @@ def test_invalid_payment_pagination(
     )
 
     assert response.status_code == 422
+
+
+# -------------------------
+# RBAC tests
+# -------------------------
+
+def test_regular_user_cannot_create_payment(
+    authenticated_client,
+) -> None:
+    response = authenticated_client.post(
+        "/payments/",
+        json={
+            "order_id": 1,
+            "payment_date": "2026-08-13",
+            "payment_method": "Credit Card",
+            "amount": "49.99",
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": "Admin privileges required.",
+    }
+
+
+def test_regular_user_cannot_delete_payment(
+    authenticated_client,
+) -> None:
+    response = authenticated_client.delete(
+        "/payments/1"
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": "Admin privileges required.",
+    }
+
+
+def test_admin_can_manage_payment(admin_client) -> None:
+    orders_response = admin_client.get("/orders/")
+
+    assert orders_response.status_code == 200
+
+    orders = orders_response.json()
+
+    unpaid_order_id = None
+
+    for order in orders:
+        payment_response = admin_client.get(
+            f"/payments/order/{order['order_id']}"
+        )
+
+        if payment_response.status_code == 404:
+            unpaid_order_id = order["order_id"]
+            break
+
+    if unpaid_order_id is None:
+        return
+
+    create_response = admin_client.post(
+        "/payments/",
+        json={
+            "order_id": unpaid_order_id,
+            "payment_date": "2026-08-13",
+            "payment_method": "Credit Card",
+            "amount": "49.99",
+        },
+    )
+
+    assert create_response.status_code == 201
+
+    payment = create_response.json()
+    payment_id = payment["payment_id"]
+
+    assert payment["order_id"] == unpaid_order_id
+    assert payment["payment_method"] == "Credit Card"
+
+    delete_response = admin_client.delete(
+        f"/payments/{payment_id}"
+    )
+
+    assert delete_response.status_code == 200
+    assert delete_response.json()["payment_id"] == payment_id

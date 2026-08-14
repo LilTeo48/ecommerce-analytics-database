@@ -4,8 +4,7 @@ from sqlalchemy.orm import Session
 from app import crud, schemas
 from app.database import get_db
 from app.models import User
-from app.security import get_current_user
-
+from app.security import get_current_user, require_admin
 
 router = APIRouter(
     prefix="/orders",
@@ -21,9 +20,12 @@ router = APIRouter(
 def create_order(
     order: schemas.OrderCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
-    customer = crud.get_customer(db, order.customer_id)
+    customer = crud.get_customer(
+        db,
+        order.customer_id,
+    )
 
     if customer is None:
         raise HTTPException(
@@ -31,7 +33,10 @@ def create_order(
             detail="Customer not found.",
         )
 
-    return crud.create_order(db, order)
+    return crud.create_order(
+        db,
+        order,
+    )
 
 
 @router.get(
@@ -44,7 +49,11 @@ def get_orders(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return crud.get_orders(db, skip=skip, limit=limit)
+    return crud.get_orders(
+        db,
+        skip=skip,
+        limit=limit,
+    )
 
 
 @router.get(
@@ -56,7 +65,10 @@ def get_customer_orders(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    customer = crud.get_customer(db, customer_id)
+    customer = crud.get_customer(
+        db,
+        customer_id,
+    )
 
     if customer is None:
         raise HTTPException(
@@ -64,7 +76,10 @@ def get_customer_orders(
             detail="Customer not found.",
         )
 
-    return crud.get_orders_by_customer(db, customer_id)
+    return crud.get_orders_by_customer(
+        db,
+        customer_id,
+    )
 
 
 @router.get(
@@ -76,7 +91,10 @@ def get_order(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    order = crud.get_order(db, order_id)
+    order = crud.get_order(
+        db,
+        order_id,
+    )
 
     if order is None:
         raise HTTPException(

@@ -257,6 +257,7 @@ class UserLogin(BaseModel):
 class UserResponse(BaseModel):
     user_id: int
     email: EmailStr
+    role: str
     is_active: bool
 
     model_config = ConfigDict(from_attributes=True)
@@ -264,4 +265,4 @@ class UserResponse(BaseModel):
 
 class Token(BaseModel):
     access_token: str
-    token_type: str   
+    token_type: str

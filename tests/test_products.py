@@ -81,3 +81,92 @@ def test_invalid_product_pagination(
     )
 
     assert response.status_code == 422
+
+
+# -------------------------
+# RBAC tests
+# -------------------------
+
+def test_regular_user_cannot_create_product(
+    authenticated_client,
+) -> None:
+    response = authenticated_client.post(
+        "/products/",
+        json={
+            "product_name": "Unauthorized Product",
+            "category": "Testing",
+            "price": "19.99",
+            "stock_quantity": 10,
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": "Admin privileges required.",
+    }
+
+
+def test_regular_user_cannot_update_product_stock(
+    authenticated_client,
+) -> None:
+    response = authenticated_client.patch(
+        "/products/1/stock",
+        params={
+            "stock_quantity": 50,
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": "Admin privileges required.",
+    }
+
+
+def test_regular_user_cannot_delete_product(
+    authenticated_client,
+) -> None:
+    response = authenticated_client.delete(
+        "/products/1"
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": "Admin privileges required.",
+    }
+
+
+def test_admin_can_manage_product(admin_client) -> None:
+    create_response = admin_client.post(
+        "/products/",
+        json={
+            "product_name": "RBAC Admin Product",
+            "category": "Testing",
+            "price": "29.99",
+            "stock_quantity": 10,
+        },
+    )
+
+    assert create_response.status_code == 201
+
+    product = create_response.json()
+    product_id = product["product_id"]
+
+    assert product["product_name"] == "RBAC Admin Product"
+    assert product["stock_quantity"] == 10
+
+    update_response = admin_client.patch(
+        f"/products/{product_id}/stock",
+        params={
+            "stock_quantity": 25,
+        },
+    )
+
+    assert update_response.status_code == 200
+    assert update_response.json()["stock_quantity"] == 25
+
+    delete_response = admin_client.delete(
+        f"/products/{product_id}"
+    )
+
+    assert delete_response.status_code == 200
+    assert delete_response.json()["product_id"] == product_id

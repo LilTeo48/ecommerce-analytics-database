@@ -79,3 +79,70 @@ def test_invalid_customer_pagination(
     )
 
     assert response.status_code == 422
+
+
+# -------------------------
+# RBAC tests
+# -------------------------
+
+def test_regular_user_cannot_create_customer(
+    authenticated_client,
+) -> None:
+    response = authenticated_client.post(
+        "/customers/",
+        json={
+            "first_name": "Regular",
+            "last_name": "User",
+            "email": "regular_rbac_customer@example.com",
+            "city": "Miami",
+            "state": "FL",
+            "signup_date": "2026-08-13",
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": "Admin privileges required.",
+    }
+
+
+def test_regular_user_cannot_delete_customer(
+    authenticated_client,
+) -> None:
+    response = authenticated_client.delete(
+        "/customers/1"
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": "Admin privileges required.",
+    }
+
+
+def test_admin_can_manage_customer(admin_client) -> None:
+    create_response = admin_client.post(
+        "/customers/",
+        json={
+            "first_name": "Admin",
+            "last_name": "Customer",
+            "email": "admin_rbac_customer@example.com",
+            "city": "Fort Lauderdale",
+            "state": "FL",
+            "signup_date": "2026-08-13",
+        },
+    )
+
+    assert create_response.status_code == 201
+
+    customer = create_response.json()
+    customer_id = customer["customer_id"]
+
+    assert customer["first_name"] == "Admin"
+    assert customer["last_name"] == "Customer"
+
+    delete_response = admin_client.delete(
+        f"/customers/{customer_id}"
+    )
+
+    assert delete_response.status_code == 200
+    assert delete_response.json()["customer_id"] == customer_id

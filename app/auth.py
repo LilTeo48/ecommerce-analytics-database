@@ -12,11 +12,9 @@ from app.schemas import (
 )
 from app.security import (
     create_access_token,
-     hash_password,
-     verify_password,
-
+    hash_password,
+    verify_password,
 )
-
 
 
 router = APIRouter(
@@ -47,6 +45,7 @@ def register_user(
     new_user = User(
         email=user_data.email,
         hashed_password=hash_password(user_data.password),
+        role="user",
         is_active=True,
     )
 
@@ -55,6 +54,7 @@ def register_user(
     db.refresh(new_user)
 
     return new_user
+
 
 @router.post(
     "/login",
@@ -91,4 +91,4 @@ def login_user(
     return {
         "access_token": access_token,
         "token_type": "bearer",
-    }   
+    }

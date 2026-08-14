@@ -81,3 +81,46 @@ def test_invalid_order_pagination(
     )
 
     assert response.status_code == 422
+
+
+# -------------------------
+# RBAC tests
+# -------------------------
+
+def test_regular_user_cannot_create_order(
+    authenticated_client,
+) -> None:
+    response = authenticated_client.post(
+        "/orders/",
+        json={
+            "customer_id": 1,
+            "order_date": "2026-08-13",
+            "order_status": "Pending",
+            "total_amount": "49.99",
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": "Admin privileges required.",
+    }
+
+
+def test_admin_can_create_order(admin_client) -> None:
+    response = admin_client.post(
+        "/orders/",
+        json={
+            "customer_id": 1,
+            "order_date": "2026-08-13",
+            "order_status": "Pending",
+            "total_amount": "49.99",
+        },
+    )
+
+    assert response.status_code == 201
+
+    order = response.json()
+
+    assert order["customer_id"] == 1
+    assert order["order_status"] == "Pending"
+    assert float(order["total_amount"]) == 49.99

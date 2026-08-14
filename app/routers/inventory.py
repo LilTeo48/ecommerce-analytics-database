@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app import crud, schemas
 from app.database import get_db
 from app.models import User
-from app.security import get_current_user
+from app.security import get_current_user, require_admin
 
 
 router = APIRouter(
@@ -23,7 +23,11 @@ def get_inventory(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return crud.get_inventory(db, skip=skip, limit=limit)
+    return crud.get_inventory(
+        db,
+        skip=skip,
+        limit=limit,
+    )
 
 
 @router.get(
@@ -35,7 +39,10 @@ def get_low_stock_products(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return crud.get_low_stock_products(db, threshold=threshold)
+    return crud.get_low_stock_products(
+        db,
+        threshold=threshold,
+    )
 
 
 @router.get(
@@ -47,7 +54,10 @@ def get_product_inventory(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    product = crud.get_product(db, product_id)
+    product = crud.get_product(
+        db,
+        product_id,
+    )
 
     if product is None:
         raise HTTPException(
@@ -66,7 +76,7 @@ def set_product_stock(
     product_id: int,
     stock_update: schemas.StockUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     product = crud.set_product_stock(
         db,
@@ -91,7 +101,7 @@ def adjust_product_stock(
     product_id: int,
     stock_adjustment: schemas.StockAdjustment,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     try:
         product = crud.adjust_product_stock(

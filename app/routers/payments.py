@@ -4,8 +4,7 @@ from sqlalchemy.orm import Session
 from app import crud, schemas
 from app.database import get_db
 from app.models import User
-from app.security import get_current_user
-
+from app.security import get_current_user, require_admin
 
 router = APIRouter(
     prefix="/payments",
@@ -21,9 +20,12 @@ router = APIRouter(
 def create_payment(
     payment: schemas.PaymentCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
-    order = crud.get_order(db, payment.order_id)
+    order = crud.get_order(
+        db,
+        payment.order_id,
+    )
 
     if order is None:
         raise HTTPException(
@@ -42,7 +44,10 @@ def create_payment(
             detail="This order already has a payment.",
         )
 
-    return crud.create_payment(db, payment)
+    return crud.create_payment(
+        db,
+        payment,
+    )
 
 
 @router.get(
@@ -55,7 +60,11 @@ def get_payments(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return crud.get_payments(db, skip=skip, limit=limit)
+    return crud.get_payments(
+        db,
+        skip=skip,
+        limit=limit,
+    )
 
 
 @router.get(
@@ -67,7 +76,10 @@ def get_payment_by_order(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    order = crud.get_order(db, order_id)
+    order = crud.get_order(
+        db,
+        order_id,
+    )
 
     if order is None:
         raise HTTPException(
@@ -75,7 +87,10 @@ def get_payment_by_order(
             detail="Order not found.",
         )
 
-    payment = crud.get_payment_by_order(db, order_id)
+    payment = crud.get_payment_by_order(
+        db,
+        order_id,
+    )
 
     if payment is None:
         raise HTTPException(
@@ -95,7 +110,10 @@ def get_payment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    payment = crud.get_payment(db, payment_id)
+    payment = crud.get_payment(
+        db,
+        payment_id,
+    )
 
     if payment is None:
         raise HTTPException(
@@ -113,9 +131,12 @@ def get_payment(
 def delete_payment(
     payment_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
-    payment = crud.delete_payment(db, payment_id)
+    payment = crud.delete_payment(
+        db,
+        payment_id,
+    )
 
     if payment is None:
         raise HTTPException(

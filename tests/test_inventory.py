@@ -89,8 +89,8 @@ def test_invalid_inventory_pagination(authenticated_client) -> None:
     assert response.status_code == 422
 
 
-def test_invalid_stock_adjustment(authenticated_client) -> None:
-    inventory_response = authenticated_client.get("/inventory/")
+def test_invalid_stock_adjustment(admin_client) -> None:
+    inventory_response = admin_client.get("/inventory/")
 
     assert inventory_response.status_code == 200
 
@@ -101,7 +101,7 @@ def test_invalid_stock_adjustment(authenticated_client) -> None:
 
     product_id = inventory[0]["product_id"]
 
-    response = authenticated_client.patch(
+    response = admin_client.patch(
         f"/inventory/{product_id}/adjust",
         json={
             "adjustment": 0,
@@ -109,3 +109,94 @@ def test_invalid_stock_adjustment(authenticated_client) -> None:
     )
 
     assert response.status_code == 422
+
+
+# -------------------------
+# RBAC tests
+# -------------------------
+
+def test_regular_user_cannot_set_product_stock(
+    authenticated_client,
+) -> None:
+    response = authenticated_client.put(
+        "/inventory/1/stock",
+        json={
+            "stock_quantity": 50,
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": "Admin privileges required.",
+    }
+
+
+def test_regular_user_cannot_adjust_product_stock(
+    authenticated_client,
+) -> None:
+    response = authenticated_client.patch(
+        "/inventory/1/adjust",
+        json={
+            "adjustment": 5,
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": "Admin privileges required.",
+    }
+
+
+def test_admin_can_manage_inventory(admin_client) -> None:
+    inventory_response = admin_client.get("/inventory/")
+
+    assert inventory_response.status_code == 200
+
+    inventory = inventory_response.json()
+
+    if not inventory:
+        return
+
+    product = inventory[0]
+
+    product_id = product["product_id"]
+    original_stock = product["stock_quantity"]
+
+    set_response = admin_client.put(
+        f"/inventory/{product_id}/stock",
+        json={
+            "stock_quantity": original_stock + 10,
+        },
+    )
+
+    assert set_response.status_code == 200
+    assert (
+        set_response.json()["stock_quantity"]
+        == original_stock + 10
+    )
+
+    adjust_response = admin_client.patch(
+        f"/inventory/{product_id}/adjust",
+        json={
+            "adjustment": -5,
+        },
+    )
+
+    assert adjust_response.status_code == 200
+    assert (
+        adjust_response.json()["stock_quantity"]
+        == original_stock + 5
+    )
+
+    restore_response = admin_client.put(
+        f"/inventory/{product_id}/stock",
+        json={
+            "stock_quantity": original_stock,
+        },
+    )
+
+    assert restore_response.status_code == 200
+    assert (
+        restore_response.json()["stock_quantity"]
+        == original_stock
+    )

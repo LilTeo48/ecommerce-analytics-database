@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app import crud, schemas
 from app.database import get_db
 from app.models import User
-from app.security import get_current_user
+from app.security import get_current_user, require_admin
 
 
 router = APIRouter(
@@ -21,9 +21,12 @@ router = APIRouter(
 def create_shipment(
     shipment: schemas.ShipmentCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
-    order = crud.get_order(db, shipment.order_id)
+    order = crud.get_order(
+        db,
+        shipment.order_id,
+    )
 
     if order is None:
         raise HTTPException(
@@ -42,7 +45,10 @@ def create_shipment(
             detail="This order already has a shipment.",
         )
 
-    return crud.create_shipment(db, shipment)
+    return crud.create_shipment(
+        db,
+        shipment,
+    )
 
 
 @router.get(
@@ -55,7 +61,11 @@ def get_shipments(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return crud.get_shipments(db, skip=skip, limit=limit)
+    return crud.get_shipments(
+        db,
+        skip=skip,
+        limit=limit,
+    )
 
 
 @router.get(
@@ -67,7 +77,10 @@ def get_shipment_by_order(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    order = crud.get_order(db, order_id)
+    order = crud.get_order(
+        db,
+        order_id,
+    )
 
     if order is None:
         raise HTTPException(
@@ -75,7 +88,10 @@ def get_shipment_by_order(
             detail="Order not found.",
         )
 
-    shipment = crud.get_shipment_by_order(db, order_id)
+    shipment = crud.get_shipment_by_order(
+        db,
+        order_id,
+    )
 
     if shipment is None:
         raise HTTPException(
@@ -95,7 +111,10 @@ def get_shipment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    shipment = crud.get_shipment(db, shipment_id)
+    shipment = crud.get_shipment(
+        db,
+        shipment_id,
+    )
 
     if shipment is None:
         raise HTTPException(
@@ -112,9 +131,12 @@ def get_shipment(
 )
 def update_shipment_status(
     shipment_id: int,
-    shipping_status: str = Query(min_length=1, max_length=50),
+    shipping_status: str = Query(
+        min_length=1,
+        max_length=50,
+    ),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     shipment = crud.update_shipment_status(
         db,
@@ -138,9 +160,12 @@ def update_shipment_status(
 def delete_shipment(
     shipment_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
-    shipment = crud.delete_shipment(db, shipment_id)
+    shipment = crud.delete_shipment(
+        db,
+        shipment_id,
+    )
 
     if shipment is None:
         raise HTTPException(

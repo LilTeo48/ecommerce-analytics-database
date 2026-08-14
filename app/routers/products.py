@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app import crud, schemas
 from app.database import get_db
 from app.models import User
-from app.security import get_current_user
+from app.security import get_current_user, require_admin
 
 
 router = APIRouter(
@@ -21,7 +21,7 @@ router = APIRouter(
 def create_product(
     product: schemas.ProductCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     return crud.create_product(db, product)
 
@@ -36,7 +36,11 @@ def get_products(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return crud.get_products(db, skip=skip, limit=limit)
+    return crud.get_products(
+        db,
+        skip=skip,
+        limit=limit,
+    )
 
 
 @router.get(
@@ -48,7 +52,10 @@ def get_product(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    product = crud.get_product(db, product_id)
+    product = crud.get_product(
+        db,
+        product_id,
+    )
 
     if product is None:
         raise HTTPException(
@@ -67,7 +74,7 @@ def update_product_stock(
     product_id: int,
     stock_quantity: int = Query(ge=0),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     product = crud.update_product_stock(
         db,
@@ -91,9 +98,12 @@ def update_product_stock(
 def delete_product(
     product_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
-    product = crud.delete_product(db, product_id)
+    product = crud.delete_product(
+        db,
+        product_id,
+    )
 
     if product is None:
         raise HTTPException(

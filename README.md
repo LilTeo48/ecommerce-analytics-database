@@ -2,7 +2,7 @@
 
 A production-style backend REST API built with **FastAPI, PostgreSQL, SQLAlchemy, and Docker** for managing e-commerce operations and generating business analytics.
 
-The project demonstrates backend API development, relational database design, JWT authentication, automated testing, containerization, and continuous integration with GitHub Actions.
+The project demonstrates backend API development, relational database design, JWT authentication, role-based access control (RBAC), transactional order processing, automated testing, containerization, and continuous integration with GitHub Actions.
 
 ## Features
 
@@ -11,10 +11,19 @@ The project demonstrates backend API development, relational database design, JW
 - SQLAlchemy ORM
 - Pydantic request and response validation
 - JWT-based authentication
+- Password hashing and bearer token authentication
+- Role-based access control (RBAC)
+- User and administrator roles
 - Protected API endpoints
+- Admin-protected write operations
 - Customer management
 - Product management
-- Order management
+- Transactional order creation
+- Order item management
+- Server-side order total calculation
+- Database-controlled product pricing
+- Inventory validation and automatic stock deduction
+- Transaction rollback for failed orders
 - Payment management
 - Shipment tracking
 - Inventory management
@@ -43,17 +52,20 @@ The project demonstrates backend API development, relational database design, JW
 - SQL
 - psycopg2
 
-### Authentication
+### Authentication & Authorization
 
 - JSON Web Tokens (JWT)
 - Password hashing
 - Bearer token authentication
+- Role-based access control (RBAC)
+- User and administrator roles
 
 ### Testing
 
 - Pytest
 - FastAPI TestClient
 - HTTPX
+- PostgreSQL-backed integration testing
 
 ### DevOps & Tools
 
@@ -72,7 +84,8 @@ ecommerce-analytics-database/
 │
 ├── .github/
 │   └── workflows/
-│       └── ci.yml
+│       ├── ci.yml
+│       └── tests.yml
 │
 ├── app/
 │   ├── routers/
@@ -122,11 +135,15 @@ ecommerce-analytics-database/
 
 The API uses JWT bearer authentication to protect application endpoints.
 
-Authentication endpoints include:
+Authentication functionality includes:
 
-- Register user
-- Login user
-- Generate JWT access token
+- User registration
+- User login
+- Secure password hashing
+- JWT access token generation
+- Authenticated API access
+- Active-user validation
+- Role-based authorization
 
 Protected requests use the following header:
 
@@ -134,42 +151,85 @@ Protected requests use the following header:
 Authorization: Bearer <access_token>
 ```
 
+### Role-Based Access Control
+
+The application supports two authorization roles:
+
+- `user`
+- `admin`
+
+Authenticated users can access protected read endpoints, while administrative operations require the `admin` role.
+
+Admin-protected operations include creating, modifying, or deleting transactional resources such as:
+
+- Customers
+- Products
+- Orders
+- Payments
+- Shipments
+- Inventory stock levels
+
+Unauthorized write attempts return an HTTP `403 Forbidden` response.
+
 ### Customers
 
 - Get customers
 - Get individual customer
+- Create customers with administrator privileges
+- Delete customers with administrator privileges
 - Pagination support
 
 ### Products
 
 - Get products
 - Get individual product
+- Create products with administrator privileges
+- Update product stock with administrator privileges
+- Delete products with administrator privileges
 - Pagination support
 
 ### Orders
 
 - Get orders
 - Get individual order
-- Order management
+- Get orders by customer
+- Create transactional orders with administrator privileges
+- Create multiple order items in a single request
+- Validate requested products and inventory
+- Retrieve product prices directly from the database
+- Calculate order totals server-side
+- Automatically deduct purchased quantities from inventory
+- Roll back failed order transactions
 
 ### Payments
 
 - Get payments
 - Get individual payment
-- Payment management
+- Get payment by order
+- Create payments with administrator privileges
+- Delete payments with administrator privileges
+- Prevent duplicate payments for the same order
+- Pagination support
 
 ### Shipments
 
 - Get shipments
 - Get individual shipment
-- Shipment tracking
+- Get shipment by order
+- Create shipments with administrator privileges
+- Update shipment status with administrator privileges
+- Delete shipments with administrator privileges
+- Prevent duplicate shipments for the same order
+- Pagination support
 
 ### Inventory
 
 - View inventory
 - View low-stock products
-- Set product stock
-- Adjust product stock
+- View inventory by product
+- Set product stock with administrator privileges
+- Adjust product stock with administrator privileges
+- Validate inventory adjustments
 
 ### Analytics
 
@@ -190,10 +250,54 @@ Available analytics include:
 
 ---
 
+## Transactional Order Processing
+
+Order creation is handled as a database transaction.
+
+Clients submit the customer, order information, and requested products:
+
+```json
+{
+  "customer_id": 1,
+  "order_date": "2026-08-13",
+  "order_status": "Pending",
+  "items": [
+    {
+      "product_id": 1,
+      "quantity": 2
+    },
+    {
+      "product_id": 3,
+      "quantity": 1
+    }
+  ]
+}
+```
+
+Clients do **not** provide product prices or the final order total.
+
+During order creation, the backend:
+
+1. Validates that the customer exists.
+2. Validates that each requested product exists.
+3. Retrieves current product prices from PostgreSQL.
+4. Verifies sufficient inventory is available.
+5. Calculates the total order amount server-side.
+6. Creates the order.
+7. Creates the associated order items.
+8. Deducts purchased quantities from inventory.
+9. Commits the complete transaction.
+
+If any part of the operation fails, the transaction is rolled back so partial orders and incorrect inventory updates are not persisted.
+
+Duplicate products within the same order request are rejected during request validation.
+
+---
+
 ## Example Analytics Endpoints
 
 | Method | Endpoint | Description |
-|---|---|---|
+| ------ | -------- | ----------- |
 | GET | `/analytics/revenue/summary` | Overall revenue metrics |
 | GET | `/analytics/revenue/monthly` | Monthly revenue trends |
 | GET | `/analytics/revenue/by-category` | Revenue grouped by product category |
@@ -216,6 +320,8 @@ curl -X POST http://localhost:8000/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email":"user@example.com","password":"Password123!"}'
 ```
+
+New accounts are assigned the standard `user` role by default.
 
 ### Login
 
@@ -251,6 +357,21 @@ curl http://localhost:8000/analytics/revenue/summary \
 git clone https://github.com/LilTeo48/ecommerce-analytics-database.git
 cd ecommerce-analytics-database
 ```
+
+### Configure Environment Variables
+
+The application requires JWT configuration in addition to its database connection.
+
+Example development configuration:
+
+```text
+DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/ecommerce_analytics
+JWT_SECRET_KEY=<your-secret-key>
+JWT_ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+```
+
+Do not commit production secrets to source control.
 
 ### Start the Application
 
@@ -288,7 +409,7 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-Start the API:
+Configure the required environment variables and start the API:
 
 ```bash
 uvicorn app.main:app --reload
@@ -312,25 +433,36 @@ http://localhost:8000/docs
 http://localhost:8000/redoc
 ```
 
-Swagger UI can also be used to authenticate with a JWT token and test protected API endpoints interactively.
+Swagger UI can be used to authenticate with a JWT token and test protected API endpoints interactively.
 
 ---
 
 ## Automated Testing
 
-The project includes a Pytest test suite covering:
+The project currently includes **79 automated tests** covering:
 
-- Authentication
+- User registration and login
+- JWT authentication
 - Protected routes
+- Role-based access control
+- Administrator authorization
 - Health endpoints
 - Customers
 - Products
 - Orders
+- Transactional order creation
+- Order items
+- Database-controlled product pricing
+- Server-side order total calculation
+- Inventory deduction
+- Insufficient-stock handling
+- Transaction rollback behavior
 - Payments
 - Shipments
 - Inventory
 - Analytics
 - Pagination validation
+- Request validation
 - Error handling
 
 Run the complete test suite with:
@@ -339,7 +471,13 @@ Run the complete test suite with:
 python -m pytest -v
 ```
 
-The tests exercise the FastAPI application against PostgreSQL and verify API responses, validation behavior, authentication requirements, and business analytics.
+The tests exercise the FastAPI application against PostgreSQL and verify API responses, validation behavior, authentication and authorization requirements, transactional behavior, inventory integrity, and business analytics.
+
+The current test suite passes:
+
+```text
+79 passed
+```
 
 ---
 
@@ -347,49 +485,70 @@ The tests exercise the FastAPI application against PostgreSQL and verify API res
 
 GitHub Actions provides automated continuous integration for the project.
 
-The CI workflow runs automatically on:
+The repository contains automated workflows that run on:
 
 - Pushes to `main`
 - Pull requests targeting `main`
 
-The pipeline:
+The CI pipelines:
 
-1. Checks out the repository
-2. Starts a PostgreSQL 16 service
-3. Configures Python
-4. Installs project dependencies
-5. Initializes the database schema
-6. Loads seed data
-7. Runs the complete Pytest test suite
+1. Check out the repository.
+2. Start a PostgreSQL 16 service.
+3. Configure Python 3.13.
+4. Install project dependencies.
+5. Configure test JWT environment variables.
+6. Initialize the database schema.
+7. Load seed data.
+8. Run the complete Pytest test suite.
 
-This ensures changes are automatically validated in a clean environment before they are integrated into the project.
+Both GitHub Actions workflows currently pass successfully with the complete test suite.
+
+This ensures authentication, authorization, transactional order processing, database operations, and analytics are validated in a clean environment whenever changes are pushed.
 
 ---
 
 ## Database Design
 
-The PostgreSQL database models core e-commerce entities including:
+The PostgreSQL database models the core e-commerce entities:
 
+- Users
 - Customers
 - Products
 - Orders
 - Order items
 - Payments
 - Shipments
-- Users
 
-The API uses SQLAlchemy to interact with the relational database while SQL-based analytics aggregate transactional data into business metrics.
+The `users` table supports authentication and role-based authorization, while the transactional tables model customer purchases, inventory changes, payments, and shipments.
+
+The API uses SQLAlchemy for application-level database operations while SQL-based analytics aggregate transactional data into business metrics.
+
+---
+
+## Security
+
+The API includes several backend security controls:
+
+- Passwords are stored as secure password hashes rather than plaintext.
+- JWT access tokens are used for authenticated requests.
+- Inactive user accounts are rejected.
+- Administrative operations require the `admin` role.
+- Regular users cannot perform protected write operations.
+- JWT configuration is loaded through environment variables.
+- Product prices and order totals are controlled by the server rather than trusted from client input.
 
 ---
 
 ## Future Improvements
 
-- Role-based authorization
-- Streamlit analytics dashboard
-- Cloud API deployment
-- Managed PostgreSQL deployment
-- Redis caching
 - Database migrations with Alembic
+- Improved test database isolation
+- Production configuration and structured logging
+- Production-ready Docker deployment configuration
+- AWS cloud deployment
+- Managed PostgreSQL deployment
+- Streamlit analytics dashboard
+- Redis caching
 - Expanded integration testing
 - Frontend analytics dashboard
 
@@ -406,5 +565,7 @@ Backend Software Engineering | Python | FastAPI | PostgreSQL | SQL
 
 ### Connect with Me
 
-- GitHub: `LilTeo48`
-- LinkedIn: `tyler-chadwick-81b9a6275`
+### Connect with Me
+
+- GitHub: [github.com/LilTeo48](https://github.com/LilTeo48)
+- LinkedIn: [linkedin.com/in/tyler-chadwick-81b9a6275](https://www.linkedin.com/in/tyler-chadwick-81b9a6275/)

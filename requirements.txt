@@ -27,3 +27,4 @@ uvicorn==0.46.0
 websockets==16.0
 pwdlib[argon2]==0.3.0
 PyJWT==2.13.0
+alembic==1.19.1

@@ -227,3 +227,8 @@ class User(Base):
         nullable=False,
         server_default=func.now(),
     )
+
+    last_login_at: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True,
+    )

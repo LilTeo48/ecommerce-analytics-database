@@ -11,24 +11,23 @@ The project demonstrates backend API development, relational database design, JW
 - SQLAlchemy ORM
 - Pydantic request and response validation
 - JWT-based authentication
-- Password hashing and bearer token authentication
-- Role-based access control (RBAC)
-- User and administrator roles
+- Access and refresh token support
+- Refresh token rotation and revocation
 - Protected API endpoints
-- Admin-protected write operations
+- Authenticated user profile endpoint
+- Password change with session revocation
+- Logout and logout-all session management
+- Account deactivation
+- Role-based authorization
 - Customer management
 - Product management
-- Transactional order creation
-- Order item management
-- Server-side order total calculation
-- Database-controlled product pricing
-- Inventory validation and automatic stock deduction
-- Transaction rollback for failed orders
+- Order management
 - Payment management
 - Shipment tracking
 - Inventory management
 - Business analytics
 - Pagination and input validation
+- Database migrations with Alembic
 - Docker containerization
 - Automated testing with Pytest
 - Continuous Integration with GitHub Actions
@@ -131,25 +130,30 @@ ecommerce-analytics-database/
 
 ## API Modules
 
-### Authentication
+## Authentication
 
-The API uses JWT bearer authentication to protect application endpoints.
+The API uses JWT bearer authentication with short-lived access tokens and longer-lived refresh tokens.
 
-Authentication functionality includes:
+Authentication features include:
 
 - User registration
 - User login
-- Secure password hashing
-- JWT access token generation
-- Authenticated API access
-- Active-user validation
+- JWT access tokens
+- Refresh tokens
+- Refresh token rotation
+- Refresh token revocation
+- Logout
+- Logout from all sessions
+- Authenticated user profile retrieval
+- Password changes
+- Session revocation after password changes
+- Account deactivation
 - Role-based authorization
 
 Protected requests use the following header:
 
 ```text
 Authorization: Bearer <access_token>
-```
 
 ### Role-Based Access Control
 
@@ -439,32 +443,37 @@ Swagger UI can be used to authenticate with a JWT token and test protected API e
 
 ## Automated Testing
 
-The project currently includes **79 automated tests** covering:
+The project includes a Pytest test suite covering:
 
-- User registration and login
-- JWT authentication
+- Authentication
+- Registration and login
+- JWT access tokens
+- Refresh token rotation
+- Refresh token reuse prevention
+- Refresh token revocation
+- Logout
+- Logout-all session management
+- Authenticated user profile access
+- Password changes
+- Session revocation after password changes
+- Account deactivation
 - Protected routes
-- Role-based access control
-- Administrator authorization
+- Role-based authorization
 - Health endpoints
 - Customers
 - Products
 - Orders
-- Transactional order creation
-- Order items
-- Database-controlled product pricing
-- Server-side order total calculation
-- Inventory deduction
-- Insufficient-stock handling
-- Transaction rollback behavior
 - Payments
 - Shipments
 - Inventory
 - Analytics
 - Pagination validation
-- Request validation
 - Error handling
 
+Run the complete test suite with:
+
+```bash
+python -m pytest -v
 Run the complete test suite with:
 
 ```bash
@@ -507,23 +516,26 @@ This ensures authentication, authorization, transactional order processing, data
 
 ---
 
+
+For the database section, I’d also add Alembic explicitly:
+
+```markdown
 ## Database Design
 
-The PostgreSQL database models the core e-commerce entities:
+The PostgreSQL database models core e-commerce entities including:
 
-- Users
 - Customers
 - Products
 - Orders
 - Order items
 - Payments
 - Shipments
+- Users
+- Refresh tokens
 
-The `users` table supports authentication and role-based authorization, while the transactional tables model customer purchases, inventory changes, payments, and shipments.
+SQLAlchemy provides ORM-based database access, while Alembic manages database schema migrations.
 
-The API uses SQLAlchemy for application-level database operations while SQL-based analytics aggregate transactional data into business metrics.
-
----
+The analytics layer uses SQL-based aggregations over transactional e-commerce data to generate business metrics.
 
 ## Security
 
@@ -541,18 +553,16 @@ The API includes several backend security controls:
 
 ## Future Improvements
 
-- Database migrations with Alembic
-- Improved test database isolation
-- Production configuration and structured logging
-- Production-ready Docker deployment configuration
-- AWS cloud deployment
-- Managed PostgreSQL deployment
+- Login abuse protection and temporary account lockout
+- Rate limiting
 - Streamlit analytics dashboard
+- Cloud API deployment
+- Managed PostgreSQL deployment
 - Redis caching
 - Expanded integration testing
 - Frontend analytics dashboard
-
----
+- Email verification
+- Password reset workflow
 
 ## Author
 

@@ -302,11 +302,21 @@ class ChangePasswordRequest(BaseModel):
         min_length=8,
         max_length=128,
     )
+
+
 class DeactivateAccountRequest(BaseModel):
     password: str = Field(
         min_length=8,
         max_length=128,
     )
+
+
+class EmailVerificationRequest(BaseModel):
+    verification_token: str = Field(
+        min_length=1,
+        max_length=64,
+    )
+
 
 class UserResponse(BaseModel):
     user_id: int

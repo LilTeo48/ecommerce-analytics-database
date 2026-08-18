@@ -8,7 +8,10 @@ from sqlalchemy import select
 # Local pytest runs connect to Docker PostgreSQL through the host-mapped port.
 os.environ.setdefault(
     "DATABASE_URL",
-    "postgresql+psycopg2://postgres:postgres@127.0.0.1:5433/ecommerce_analytics",
+    (
+        "postgresql+psycopg2://postgres:postgres"
+        "@127.0.0.1:5433/ecommerce_analytics"
+    ),
 )
 
 from app.database import SessionLocal
@@ -36,6 +39,23 @@ def auth_headers(client):
 
     assert register_response.status_code == 201
 
+    # Most authenticated tests represent users who have
+    # already completed email verification.
+    with SessionLocal() as db:
+        user = db.scalar(
+            select(User).where(
+                User.email == email
+            )
+        )
+
+        assert user is not None
+
+        user.is_verified = True
+        user.verification_token = None
+        user.verification_token_expires_at = None
+
+        db.commit()
+
     login_response = client.post(
         "/auth/login",
         json={
@@ -54,7 +74,10 @@ def auth_headers(client):
 
 
 @pytest.fixture
-def authenticated_client(client, auth_headers):
+def authenticated_client(
+    client,
+    auth_headers,
+):
     client.headers.update(auth_headers)
     return client
 
@@ -76,12 +99,17 @@ def admin_client(client):
 
     with SessionLocal() as db:
         user = db.scalar(
-            select(User).where(User.email == email)
+            select(User).where(
+                User.email == email
+            )
         )
 
         assert user is not None
 
         user.role = "admin"
+        user.is_verified = True
+        user.verification_token = None
+        user.verification_token_expires_at = None
 
         db.commit()
 

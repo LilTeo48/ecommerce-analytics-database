@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from jwt import InvalidTokenError
@@ -10,6 +11,7 @@ from app.models import RefreshToken, User
 from app.schemas import (
     ChangePasswordRequest,
     DeactivateAccountRequest,
+    EmailVerificationRequest,
     RefreshTokenRequest,
     Token,
     UserCreate,
@@ -33,6 +35,7 @@ router = APIRouter(
 
 MAX_FAILED_LOGIN_ATTEMPTS = 5
 ACCOUNT_LOCKOUT_MINUTES = 15
+EMAIL_VERIFICATION_EXPIRE_HOURS = 24
 
 
 def utc_now_naive() -> datetime:
@@ -52,6 +55,7 @@ def utc_now_naive() -> datetime:
     response_model=UserResponse,
     status_code=status.HTTP_201_CREATED,
 )
+
 def register_user(
     user_data: UserCreate,
     db: Session = Depends(get_db),
@@ -68,6 +72,15 @@ def register_user(
             detail="A user with this email already exists.",
         )
 
+    verification_token = secrets.token_urlsafe(32)
+
+    verification_token_expires_at = (
+        utc_now_naive()
+        + timedelta(
+            hours=EMAIL_VERIFICATION_EXPIRE_HOURS
+        )
+    )
+
     new_user = User(
         email=user_data.email,
         hashed_password=hash_password(
@@ -75,6 +88,11 @@ def register_user(
         ),
         role="user",
         is_active=True,
+        is_verified=False,
+        verification_token=verification_token,
+        verification_token_expires_at=(
+            verification_token_expires_at
+        ),
     )
 
     db.add(new_user)
@@ -82,6 +100,49 @@ def register_user(
     db.refresh(new_user)
 
     return new_user
+
+
+@router.post(
+    "/verify-email",
+    status_code=status.HTTP_200_OK,
+)
+def verify_email(
+    verification_data: EmailVerificationRequest,
+    db: Session = Depends(get_db),
+):
+    user = db.scalar(
+        select(User).where(
+            User.verification_token
+            == verification_data.verification_token
+        )
+    )
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid verification token.",
+        )
+
+    now = utc_now_naive()
+
+    if (
+        user.verification_token_expires_at is None
+        or user.verification_token_expires_at <= now
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Verification token has expired.",
+        )
+
+    user.is_verified = True
+    user.verification_token = None
+    user.verification_token_expires_at = None
+
+    db.commit()
+
+    return {
+        "detail": "Email verified successfully.",
+    }
 
 
 @router.post(
@@ -113,6 +174,12 @@ def login_user(
             detail="User account is inactive.",
         )
 
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Email verification required.",
+        )
+
     now = utc_now_naive()
 
     if user.locked_until is not None:
@@ -125,7 +192,7 @@ def login_user(
                 ),
             )
 
-        # The previous lockout has expired.
+        # Previous lockout has expired.
         user.locked_until = None
         user.failed_login_attempts = 0
 

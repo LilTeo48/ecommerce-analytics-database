@@ -1,6 +1,3 @@
-from uuid import uuid4
-
-
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
@@ -13,6 +10,30 @@ from app.models import User
 
 
 client = TestClient(app)
+
+def verify_test_user(email: str) -> None:
+    """
+    Mark a test user as email verified.
+
+    Existing authentication tests use this helper so they can
+    continue testing login, refresh tokens, password changes,
+    lockouts, deactivation, and other authenticated behavior
+    independently from the email-verification flow.
+    """
+    with SessionLocal() as db:
+        user = db.scalar(
+            select(User).where(
+                User.email == email
+            )
+        )
+
+        assert user is not None
+
+        user.is_verified = True
+        user.verification_token = None
+        user.verification_token_expires_at = None
+
+        db.commit()        
 
 
 def test_register_user():
@@ -78,6 +99,8 @@ def test_login_user():
 
     assert register_response.status_code == 201
 
+    verify_test_user(email)
+
     response = client.post(
         "/auth/login",
         json={
@@ -98,7 +121,6 @@ def test_login_user():
     assert data["refresh_token"]
     assert data["access_token"] != data["refresh_token"]
 
-
 def test_login_updates_last_login_at():
     email = f"pytest_last_login_{uuid4().hex}@example.com"
     password = "Password123!"
@@ -112,6 +134,8 @@ def test_login_updates_last_login_at():
     )
 
     assert register_response.status_code == 201
+
+    verify_test_user(email)
 
     with SessionLocal() as db:
         user = db.scalar(
@@ -143,19 +167,21 @@ def test_login_updates_last_login_at():
         assert user is not None
         assert user.last_login_at is not None
 
-
 def test_login_wrong_password():
-    email = f"pytest_wrong_{uuid4().hex}@example.com"
+    email = f"pytest_wrong_password_{uuid4().hex}@example.com"
+    password = "Password123!"
 
     register_response = client.post(
         "/auth/register",
         json={
             "email": email,
-            "password": "Password123!",
+            "password": password,
         },
     )
 
     assert register_response.status_code == 201
+
+    verify_test_user(email)
 
     response = client.post(
         "/auth/login",
@@ -166,10 +192,9 @@ def test_login_wrong_password():
     )
 
     assert response.status_code == 401
-    assert response.json() == {
-        "detail": "Invalid email or password."
-    }
-
+    assert response.json()["detail"] == (
+        "Invalid email or password."
+    )
 
 def test_refresh_token_creates_new_tokens():
     email = f"pytest_refresh_{uuid4().hex}@example.com"
@@ -184,6 +209,8 @@ def test_refresh_token_creates_new_tokens():
     )
 
     assert register_response.status_code == 201
+
+    verify_test_user(email)
 
     login_response = client.post(
         "/auth/login",
@@ -215,18 +242,21 @@ def test_refresh_token_creates_new_tokens():
     assert data["access_token"]
     assert data["refresh_token"]
 
-
 def test_access_token_cannot_be_used_as_refresh_token():
     email = f"pytest_access_refresh_{uuid4().hex}@example.com"
     password = "Password123!"
 
-    client.post(
+    register_response = client.post(
         "/auth/register",
         json={
             "email": email,
             "password": password,
         },
     )
+
+    assert register_response.status_code == 201
+
+    verify_test_user(email)
 
     login_response = client.post(
         "/auth/login",
@@ -251,7 +281,6 @@ def test_access_token_cannot_be_used_as_refresh_token():
     assert response.json() == {
         "detail": "Invalid refresh token."
     }
-
 
 def test_invalid_refresh_token():
     response = client.post(
@@ -298,6 +327,8 @@ def test_protected_route_with_token():
 
     assert register_response.status_code == 201
 
+    verify_test_user(email)
+
     login_response = client.post(
         "/auth/login",
         json={
@@ -334,6 +365,8 @@ def test_refresh_token_cannot_access_protected_route():
 
     assert register_response.status_code == 201
 
+    verify_test_user(email)
+
     login_response = client.post(
         "/auth/login",
         json={
@@ -368,6 +401,8 @@ def test_refresh_token_cannot_be_reused():
     )
 
     assert register_response.status_code == 201
+
+    verify_test_user(email)
 
     login_response = client.post(
         "/auth/login",
@@ -404,18 +439,21 @@ def test_refresh_token_cannot_be_reused():
 
     assert reuse_response.status_code == 401
 
-
 def test_rotated_refresh_token_can_be_used():
     email = f"pytest_rotated_{uuid4().hex}@example.com"
     password = "Password123!"
 
-    client.post(
+    register_response = client.post(
         "/auth/register",
         json={
             "email": email,
             "password": password,
         },
     )
+
+    assert register_response.status_code == 201
+
+    verify_test_user(email)
 
     login_response = client.post(
         "/auth/login",
@@ -456,18 +494,21 @@ def test_rotated_refresh_token_can_be_used():
 
     assert second_refresh_response.status_code == 200
 
-
 def test_logout_revokes_refresh_token():
     email = f"pytest_logout_{uuid4().hex}@example.com"
     password = "Password123!"
 
-    client.post(
+    register_response = client.post(
         "/auth/register",
         json={
             "email": email,
             "password": password,
         },
     )
+
+    assert register_response.status_code == 201
+
+    verify_test_user(email)
 
     login_response = client.post(
         "/auth/login",
@@ -510,13 +551,17 @@ def test_revoked_refresh_token_cannot_logout_again():
     email = f"pytest_double_logout_{uuid4().hex}@example.com"
     password = "Password123!"
 
-    client.post(
+    register_response = client.post(
         "/auth/register",
         json={
             "email": email,
             "password": password,
         },
     )
+
+    assert register_response.status_code == 201
+
+    verify_test_user(email)
 
     login_response = client.post(
         "/auth/login",
@@ -525,6 +570,8 @@ def test_revoked_refresh_token_cannot_logout_again():
             "password": password,
         },
     )
+
+    assert login_response.status_code == 200
 
     refresh_token = (
         login_response.json()["refresh_token"]
@@ -563,6 +610,8 @@ def test_change_password_success():
 
     assert register_response.status_code == 201
 
+    verify_test_user(email)
+
     login_response = client.post(
         "/auth/login",
         json={
@@ -591,18 +640,21 @@ def test_change_password_success():
         "detail": "Password changed successfully.",
     }
 
-
 def test_change_password_wrong_current_password():
     email = f"pytest_wrong_current_{uuid4().hex}@example.com"
     password = "Password123!"
 
-    client.post(
+    register_response = client.post(
         "/auth/register",
         json={
             "email": email,
             "password": password,
         },
     )
+
+    assert register_response.status_code == 201
+
+    verify_test_user(email)
 
     login_response = client.post(
         "/auth/login",
@@ -611,6 +663,8 @@ def test_change_password_wrong_current_password():
             "password": password,
         },
     )
+
+    assert login_response.status_code == 200
 
     access_token = login_response.json()["access_token"]
 
@@ -630,18 +684,21 @@ def test_change_password_wrong_current_password():
         "detail": "Current password is incorrect.",
     }
 
-
 def test_change_password_rejects_same_password():
     email = f"pytest_same_password_{uuid4().hex}@example.com"
     password = "Password123!"
 
-    client.post(
+    register_response = client.post(
         "/auth/register",
         json={
             "email": email,
             "password": password,
         },
     )
+
+    assert register_response.status_code == 201
+
+    verify_test_user(email)
 
     login_response = client.post(
         "/auth/login",
@@ -650,6 +707,8 @@ def test_change_password_rejects_same_password():
             "password": password,
         },
     )
+
+    assert login_response.status_code == 200
 
     access_token = login_response.json()["access_token"]
 
@@ -672,19 +731,22 @@ def test_change_password_rejects_same_password():
         ),
     }
 
-
 def test_old_password_fails_after_password_change():
     email = f"pytest_old_password_{uuid4().hex}@example.com"
     old_password = "Password123!"
     new_password = "NewPassword123!"
 
-    client.post(
+    register_response = client.post(
         "/auth/register",
         json={
             "email": email,
             "password": old_password,
         },
     )
+
+    assert register_response.status_code == 201
+
+    verify_test_user(email)
 
     login_response = client.post(
         "/auth/login",
@@ -693,6 +755,8 @@ def test_old_password_fails_after_password_change():
             "password": old_password,
         },
     )
+
+    assert login_response.status_code == 200
 
     access_token = login_response.json()["access_token"]
 
@@ -719,19 +783,22 @@ def test_old_password_fails_after_password_change():
 
     assert old_login_response.status_code == 401
 
-
 def test_new_password_works_after_password_change():
     email = f"pytest_new_password_{uuid4().hex}@example.com"
     old_password = "Password123!"
     new_password = "NewPassword123!"
 
-    client.post(
+    register_response = client.post(
         "/auth/register",
         json={
             "email": email,
             "password": old_password,
         },
     )
+
+    assert register_response.status_code == 201
+
+    verify_test_user(email)
 
     login_response = client.post(
         "/auth/login",
@@ -740,6 +807,8 @@ def test_new_password_works_after_password_change():
             "password": old_password,
         },
     )
+
+    assert login_response.status_code == 200
 
     access_token = login_response.json()["access_token"]
 
@@ -768,19 +837,22 @@ def test_new_password_works_after_password_change():
     assert "access_token" in new_login_response.json()
     assert "refresh_token" in new_login_response.json()
 
-
 def test_change_password_revokes_existing_refresh_tokens():
     email = f"pytest_revoke_sessions_{uuid4().hex}@example.com"
     old_password = "Password123!"
     new_password = "NewPassword123!"
 
-    client.post(
+    register_response = client.post(
         "/auth/register",
         json={
             "email": email,
             "password": old_password,
         },
     )
+
+    assert register_response.status_code == 201
+
+    verify_test_user(email)
 
     login_response = client.post(
         "/auth/login",
@@ -789,6 +861,8 @@ def test_change_password_revokes_existing_refresh_tokens():
             "password": old_password,
         },
     )
+
+    assert login_response.status_code == 200
 
     access_token = login_response.json()["access_token"]
     refresh_token = login_response.json()["refresh_token"]
@@ -839,6 +913,8 @@ def test_logout_all_revokes_multiple_refresh_tokens():
     )
 
     assert register_response.status_code == 201
+
+    verify_test_user(email)
 
     first_login = client.post(
         "/auth/login",
@@ -898,18 +974,21 @@ def test_logout_all_revokes_multiple_refresh_tokens():
     assert first_refresh_response.status_code == 401
     assert second_refresh_response.status_code == 401
 
-
 def test_fresh_login_works_after_logout_all():
     email = f"pytest_logout_all_login_{uuid4().hex}@example.com"
     password = "Password123!"
 
-    client.post(
+    register_response = client.post(
         "/auth/register",
         json={
             "email": email,
             "password": password,
         },
     )
+
+    assert register_response.status_code == 201
+
+    verify_test_user(email)
 
     login_response = client.post(
         "/auth/login",
@@ -943,7 +1022,6 @@ def test_fresh_login_works_after_logout_all():
     assert fresh_login_response.status_code == 200
     assert "access_token" in fresh_login_response.json()
     assert "refresh_token" in fresh_login_response.json()
-
 
 def test_get_current_user_requires_authentication():
     response = client.get(
@@ -980,6 +1058,8 @@ def test_get_current_user_returns_authenticated_user():
 
     assert register_response.status_code == 201
 
+    verify_test_user(email)
+
     user_id = register_response.json()["user_id"]
 
     login_response = client.post(
@@ -1012,18 +1092,21 @@ def test_get_current_user_returns_authenticated_user():
     assert data["role"] == "user"
     assert data["is_active"] is True
 
-
 def test_refresh_token_cannot_access_current_user():
     email = f"pytest_me_refresh_{uuid4().hex}@example.com"
     password = "Password123!"
 
-    client.post(
+    register_response = client.post(
         "/auth/register",
         json={
             "email": email,
             "password": password,
         },
     )
+
+    assert register_response.status_code == 201
+
+    verify_test_user(email)
 
     login_response = client.post(
         "/auth/login",
@@ -1046,7 +1129,7 @@ def test_refresh_token_cannot_access_current_user():
         },
     )
 
-    assert response.status_code == 401 
+    assert response.status_code == 401
 
 def test_deactivate_account_requires_authentication() -> None:
     response = client.post(
@@ -1072,6 +1155,8 @@ def test_deactivate_account_wrong_password() -> None:
     )
 
     assert register_response.status_code == 201
+
+    verify_test_user(email)
 
     login_response = client.post(
         "/auth/login",
@@ -1100,7 +1185,6 @@ def test_deactivate_account_wrong_password() -> None:
         "detail": "Password is incorrect.",
     }
 
-
 def test_deactivate_account_success() -> None:
     email = f"pytest_deactivate_{uuid4().hex}@example.com"
     password = "Password123!"
@@ -1114,6 +1198,8 @@ def test_deactivate_account_success() -> None:
     )
 
     assert register_response.status_code == 201
+
+    verify_test_user(email)
 
     login_response = client.post(
         "/auth/login",
@@ -1159,6 +1245,8 @@ def test_deactivated_user_cannot_login() -> None:
 
     assert register_response.status_code == 201
 
+    verify_test_user(email)
+
     login_response = client.post(
         "/auth/login",
         json={
@@ -1200,7 +1288,6 @@ def test_deactivated_user_cannot_login() -> None:
         "detail": "User account is inactive.",
     }
 
-
 def test_deactivation_revokes_refresh_token() -> None:
     email = f"pytest_deactivated_refresh_{uuid4().hex}@example.com"
     password = "Password123!"
@@ -1214,6 +1301,8 @@ def test_deactivation_revokes_refresh_token() -> None:
     )
 
     assert register_response.status_code == 201
+
+    verify_test_user(email)
 
     login_response = client.post(
         "/auth/login",
@@ -1270,6 +1359,8 @@ def test_deactivated_user_access_token_stops_working() -> None:
 
     assert register_response.status_code == 201
 
+    verify_test_user(email)
+
     login_response = client.post(
         "/auth/login",
         json={
@@ -1322,6 +1413,8 @@ def test_failed_login_attempts_eventually_lock_account():
 
     assert register_response.status_code == 201
 
+    verify_test_user(email)
+
     # Five bad passwords trigger the lockout.
     for _ in range(5):
         response = client.post(
@@ -1364,6 +1457,8 @@ def test_successful_login_resets_failed_attempts():
     )
 
     assert register_response.status_code == 201
+
+    verify_test_user(email)
 
     # Accumulate failures without reaching the lockout threshold.
     for _ in range(3):
@@ -1409,7 +1504,8 @@ def test_successful_login_resets_failed_attempts():
         },
     )
 
-    assert response.status_code == 200  
+    assert response.status_code == 200
+
 
 def test_expired_lockout_allows_login():
     email = f"pytest_expired_lock_{uuid4().hex}@example.com"
@@ -1424,6 +1520,8 @@ def test_expired_lockout_allows_login():
     )
 
     assert register_response.status_code == 201
+
+    verify_test_user(email)
 
     # Trigger the account lockout with five failed attempts.
     for _ in range(5):
@@ -1488,3 +1586,186 @@ def test_expired_lockout_allows_login():
     assert "access_token" in data
     assert "refresh_token" in data
     assert data["token_type"] == "bearer"
+
+def test_registration_creates_verification_token():
+    email = f"pytest_verify_token_{uuid4().hex}@example.com"
+
+    response = client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": "Password123!",
+        },
+    )
+
+    assert response.status_code == 201
+
+    with SessionLocal() as db:
+        user = db.scalar(
+            select(User).where(
+                User.email == email
+            )
+        )
+
+        assert user is not None
+        assert user.is_verified is False
+        assert user.verification_token is not None
+        assert user.verification_token_expires_at is not None
+
+
+def test_verify_email_success():
+    email = f"pytest_verify_success_{uuid4().hex}@example.com"
+
+    register_response = client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": "Password123!",
+        },
+    )
+
+    assert register_response.status_code == 201
+
+    with SessionLocal() as db:
+        user = db.scalar(
+            select(User).where(
+                User.email == email
+            )
+        )
+
+        assert user is not None
+        token = user.verification_token
+
+    assert token is not None
+
+    response = client.post(
+        "/auth/verify-email",
+        json={
+            "verification_token": token,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["detail"] == (
+        "Email verified successfully."
+    )
+
+    with SessionLocal() as db:
+        user = db.scalar(
+            select(User).where(
+                User.email == email
+            )
+        )
+
+        assert user is not None
+        assert user.is_verified is True
+        assert user.verification_token is None
+        assert user.verification_token_expires_at is None
+
+
+def test_verify_email_invalid_token():
+    response = client.post(
+        "/auth/verify-email",
+        json={
+            "verification_token": "not-a-real-verification-token",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == (
+        "Invalid verification token."
+    )
+
+
+def test_verify_email_expired_token():
+    email = f"pytest_verify_expired_{uuid4().hex}@example.com"
+
+    register_response = client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": "Password123!",
+        },
+    )
+
+    assert register_response.status_code == 201
+
+    with SessionLocal() as db:
+        user = db.scalar(
+            select(User).where(
+                User.email == email
+            )
+        )
+
+        assert user is not None
+        assert user.verification_token is not None
+
+        token = user.verification_token
+
+        user.verification_token_expires_at = (
+            datetime.now(timezone.utc)
+            .replace(tzinfo=None)
+            - timedelta(minutes=1)
+        )
+
+        db.commit()
+
+    response = client.post(
+        "/auth/verify-email",
+        json={
+            "verification_token": token,
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == (
+        "Verification token has expired."
+    )
+
+
+def test_verification_token_cannot_be_reused():
+    email = f"pytest_verify_reuse_{uuid4().hex}@example.com"
+
+    register_response = client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": "Password123!",
+        },
+    )
+
+    assert register_response.status_code == 201
+
+    with SessionLocal() as db:
+        user = db.scalar(
+            select(User).where(
+                User.email == email
+            )
+        )
+
+        assert user is not None
+        token = user.verification_token
+
+    assert token is not None
+
+    first_response = client.post(
+        "/auth/verify-email",
+        json={
+            "verification_token": token,
+        },
+    )
+
+    assert first_response.status_code == 200
+
+    second_response = client.post(
+        "/auth/verify-email",
+        json={
+            "verification_token": token,
+        },
+    )
+
+    assert second_response.status_code == 400
+    assert second_response.json()["detail"] == (
+        "Invalid verification token."
+    )
+

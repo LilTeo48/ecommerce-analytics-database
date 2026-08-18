@@ -195,7 +195,9 @@ class User(Base):
         ),
     )
 
-    user_id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        primary_key=True,
+    )
 
     email: Mapped[str] = mapped_column(
         String(255),
@@ -246,6 +248,23 @@ class User(Base):
         nullable=True,
     )
 
+    is_verified: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+    )
+
+    verification_token: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+        unique=True,
+    )
+
+    verification_token_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True,
+    )
 
 class RefreshToken(Base):
     __tablename__ = "refresh_tokens"

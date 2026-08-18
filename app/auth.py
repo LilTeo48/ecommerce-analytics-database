@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from jwt import InvalidTokenError
@@ -30,6 +30,9 @@ router = APIRouter(
     prefix="/auth",
     tags=["Authentication"],
 )
+
+MAX_FAILED_LOGIN_ATTEMPTS = 5
+ACCOUNT_LOCKOUT_MINUTES = 15
 
 
 def utc_now_naive() -> datetime:
@@ -95,10 +98,7 @@ def login_user(
         )
     )
 
-    if user is None or not verify_password(
-        credentials.password,
-        user.hashed_password,
-    ):
+    if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password.",
@@ -113,7 +113,52 @@ def login_user(
             detail="User account is inactive.",
         )
 
-    user.last_login_at = utc_now_naive()
+    now = utc_now_naive()
+
+    if user.locked_until is not None:
+        if user.locked_until > now:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=(
+                    "Account is temporarily locked. "
+                    "Please try again later."
+                ),
+            )
+
+        # The previous lockout has expired.
+        user.locked_until = None
+        user.failed_login_attempts = 0
+
+    if not verify_password(
+        credentials.password,
+        user.hashed_password,
+    ):
+        user.failed_login_attempts += 1
+
+        if (
+            user.failed_login_attempts
+            >= MAX_FAILED_LOGIN_ATTEMPTS
+        ):
+            user.locked_until = (
+                now
+                + timedelta(
+                    minutes=ACCOUNT_LOCKOUT_MINUTES
+                )
+            )
+
+        db.commit()
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password.",
+            headers={
+                "WWW-Authenticate": "Bearer",
+            },
+        )
+
+    user.failed_login_attempts = 0
+    user.locked_until = None
+    user.last_login_at = now
 
     access_token = create_access_token(
         data={
@@ -147,7 +192,6 @@ def login_user(
         "refresh_token": refresh_token,
         "token_type": "bearer",
     }
-
 
 @router.post(
     "/refresh",

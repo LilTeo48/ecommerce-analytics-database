@@ -1,11 +1,16 @@
 from uuid import uuid4
 
+
+from datetime import datetime, timedelta, timezone
+from uuid import uuid4
+
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from app.database import SessionLocal
 from app.main import app
 from app.models import User
+
 
 client = TestClient(app)
 
@@ -1302,3 +1307,184 @@ def test_deactivated_user_access_token_stops_working() -> None:
     assert me_response.json() == {
         "detail": "User account is inactive.",
     }
+
+def test_failed_login_attempts_eventually_lock_account():
+    email = f"pytest_lockout_{uuid4().hex}@example.com"
+    password = "Password123!"
+
+    register_response = client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert register_response.status_code == 201
+
+    # Five bad passwords trigger the lockout.
+    for _ in range(5):
+        response = client.post(
+            "/auth/login",
+            json={
+                "email": email,
+                "password": "WrongPassword123!",
+            },
+        )
+
+        assert response.status_code == 401
+
+    # Even the correct password should now be rejected
+    # while the account is temporarily locked.
+    response = client.post(
+        "/auth/login",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert response.status_code == 429
+    assert response.json()["detail"] == (
+        "Account is temporarily locked. "
+        "Please try again later."
+    )
+
+
+def test_successful_login_resets_failed_attempts():
+    email = f"pytest_reset_attempts_{uuid4().hex}@example.com"
+    password = "Password123!"
+
+    register_response = client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert register_response.status_code == 201
+
+    # Accumulate failures without reaching the lockout threshold.
+    for _ in range(3):
+        response = client.post(
+            "/auth/login",
+            json={
+                "email": email,
+                "password": "WrongPassword123!",
+            },
+        )
+
+        assert response.status_code == 401
+
+    # A successful login should reset the counter.
+    response = client.post(
+        "/auth/login",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert response.status_code == 200
+
+    # Four more failures should still not lock the account,
+    # proving the previous three failures were reset.
+    for _ in range(4):
+        response = client.post(
+            "/auth/login",
+            json={
+                "email": email,
+                "password": "WrongPassword123!",
+            },
+        )
+
+        assert response.status_code == 401
+
+    response = client.post(
+        "/auth/login",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert response.status_code == 200  
+
+def test_expired_lockout_allows_login():
+    email = f"pytest_expired_lock_{uuid4().hex}@example.com"
+    password = "Password123!"
+
+    register_response = client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert register_response.status_code == 201
+
+    # Trigger the account lockout with five failed attempts.
+    for _ in range(5):
+        response = client.post(
+            "/auth/login",
+            json={
+                "email": email,
+                "password": "WrongPassword123!",
+            },
+        )
+
+        assert response.status_code == 401
+
+    # Confirm that the account is currently locked.
+    response = client.post(
+        "/auth/login",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert response.status_code == 429
+    assert response.json()["detail"] == (
+        "Account is temporarily locked. "
+        "Please try again later."
+    )
+
+    # Simulate the 15-minute lockout having expired
+    # by moving locked_until into the past.
+    with SessionLocal() as db:
+        user = db.scalar(
+            select(User).where(
+                User.email == email
+            )
+        )
+
+        assert user is not None
+
+        user.locked_until = (
+            datetime.now(timezone.utc)
+            .replace(tzinfo=None)
+            - timedelta(minutes=1)
+        )
+
+        db.commit()
+
+    # The correct password should work once
+    # the temporary lockout has expired.
+    response = client.post(
+        "/auth/login",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert "access_token" in data
+    assert "refresh_token" in data
+    assert data["token_type"] == "bearer"

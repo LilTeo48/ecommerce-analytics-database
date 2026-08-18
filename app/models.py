@@ -7,6 +7,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Integer,
     Numeric,
     String,
     func,
@@ -232,6 +233,19 @@ class User(Base):
         DateTime,
         nullable=True,
     )
+
+    failed_login_attempts: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
+
+    locked_until: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True,
+    )
+
 
 class RefreshToken(Base):
     __tablename__ = "refresh_tokens"

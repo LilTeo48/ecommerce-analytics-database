@@ -2,7 +2,7 @@
 
 A production-style backend REST API built with **FastAPI, PostgreSQL, SQLAlchemy, and Docker** for managing e-commerce operations and generating business analytics.
 
-The project demonstrates backend API development, relational database design, JWT authentication, role-based access control (RBAC), transactional order processing, automated testing, containerization, and continuous integration with GitHub Actions.
+The project demonstrates backend API development, relational database design, JWT authentication, email verification, role-based access control (RBAC), secure session management, transactional order processing, automated testing, containerization, database migrations, and continuous integration with GitHub Actions.
 
 ## Features
 
@@ -11,12 +11,15 @@ The project demonstrates backend API development, relational database design, JW
 - SQLAlchemy ORM
 - Pydantic request and response validation
 - JWT-based authentication
+- Email verification with expiring, single-use tokens
+- Login restricted to verified accounts
 - Access and refresh token support
 - Refresh token rotation and revocation
 - Protected API endpoints
 - Authenticated user profile endpoint
 - Password change with session revocation
 - Logout and logout-all session management
+- Temporary account lockout after repeated failed login attempts
 - Account deactivation
 - Role-based authorization
 - Customer management
@@ -50,12 +53,17 @@ The project demonstrates backend API development, relational database design, JW
 - PostgreSQL
 - SQL
 - psycopg2
+- Alembic
 
 ### Authentication & Authorization
 
 - JSON Web Tokens (JWT)
 - Password hashing
 - Bearer token authentication
+- Access and refresh tokens
+- Email verification
+- Refresh token rotation and revocation
+- Temporary account lockout
 - Role-based access control (RBAC)
 - User and administrator roles
 
@@ -85,6 +93,9 @@ ecommerce-analytics-database/
 │   └── workflows/
 │       ├── ci.yml
 │       └── tests.yml
+│
+├── alembic/
+│   └── versions/
 │
 ├── app/
 │   ├── routers/
@@ -120,6 +131,7 @@ ecommerce-analytics-database/
 │   ├── test_products.py
 │   └── test_shipments.py
 │
+├── alembic.ini
 ├── compose.yaml
 ├── Dockerfile
 ├── requirements.txt
@@ -130,13 +142,18 @@ ecommerce-analytics-database/
 
 ## API Modules
 
-## Authentication
+### Authentication
 
 The API uses JWT bearer authentication with short-lived access tokens and longer-lived refresh tokens.
+
+Newly registered accounts must complete email verification before they can log in.
 
 Authentication features include:
 
 - User registration
+- Email verification
+- Expiring, single-use verification tokens
+- Login restricted to verified accounts
 - User login
 - JWT access tokens
 - Refresh tokens
@@ -147,6 +164,8 @@ Authentication features include:
 - Authenticated user profile retrieval
 - Password changes
 - Session revocation after password changes
+- Failed-login tracking
+- Temporary account lockout after repeated failed login attempts
 - Account deactivation
 - Role-based authorization
 
@@ -154,6 +173,7 @@ Protected requests use the following header:
 
 ```text
 Authorization: Bearer <access_token>
+```
 
 ### Role-Based Access Control
 
@@ -309,7 +329,7 @@ Duplicate products within the same order request are rejected during request val
 | GET | `/analytics/customers/top` | Highest-value customers |
 | GET | `/analytics/orders/by-status` | Orders grouped by status |
 | GET | `/analytics/payments/by-method` | Payments grouped by payment method |
-| GET | `/analytics/shipments/by-status` | Shipments grouped by status |
+| GET | `/analytics/shipments/by-status` | Shipments grouped by shipment status |
 | GET | `/analytics/inventory/value` | Total inventory value |
 | GET | `/analytics/products/never-ordered` | Products that have never been ordered |
 
@@ -327,6 +347,20 @@ curl -X POST http://localhost:8000/auth/register \
 
 New accounts are assigned the standard `user` role by default.
 
+New users must verify their email before logging in. Registration creates a time-limited verification token associated with the account.
+
+### Verify Email
+
+```bash
+curl -X POST http://localhost:8000/auth/verify-email \
+  -H "Content-Type: application/json" \
+  -d '{"token":"<VERIFICATION_TOKEN>"}'
+```
+
+A valid verification token activates email verification for the account.
+
+Verification tokens expire and cannot be reused after successful verification.
+
 ### Login
 
 ```bash
@@ -335,14 +369,17 @@ curl -X POST http://localhost:8000/auth/login \
   -d '{"email":"user@example.com","password":"Password123!"}'
 ```
 
-A successful login returns an access token:
+A successful login returns an access token and refresh token:
 
 ```json
 {
   "access_token": "<JWT_ACCESS_TOKEN>",
+  "refresh_token": "<JWT_REFRESH_TOKEN>",
   "token_type": "bearer"
 }
 ```
+
+Unverified accounts are rejected until email verification has been completed.
 
 ### Access a Protected Endpoint
 
@@ -443,10 +480,16 @@ Swagger UI can be used to authenticate with a JWT token and test protected API e
 
 ## Automated Testing
 
-The project includes a Pytest test suite covering:
+The project includes a comprehensive Pytest test suite covering:
 
 - Authentication
-- Registration and login
+- User registration
+- Email verification
+- Verification token validation
+- Expired verification token rejection
+- Verification token reuse prevention
+- Unverified-user login rejection
+- User login
 - JWT access tokens
 - Refresh token rotation
 - Refresh token reuse prevention
@@ -456,6 +499,10 @@ The project includes a Pytest test suite covering:
 - Authenticated user profile access
 - Password changes
 - Session revocation after password changes
+- Failed-login tracking
+- Temporary account lockout
+- Successful-login failure-counter reset
+- Expired lockout recovery
 - Account deactivation
 - Protected routes
 - Role-based authorization
@@ -474,10 +521,6 @@ Run the complete test suite with:
 
 ```bash
 python -m pytest -v
-Run the complete test suite with:
-
-```bash
-python -m pytest -v
 ```
 
 The tests exercise the FastAPI application against PostgreSQL and verify API responses, validation behavior, authentication and authorization requirements, transactional behavior, inventory integrity, and business analytics.
@@ -485,7 +528,7 @@ The tests exercise the FastAPI application against PostgreSQL and verify API res
 The current test suite passes:
 
 ```text
-79 passed
+115 passed
 ```
 
 ---
@@ -510,16 +553,12 @@ The CI pipelines:
 7. Load seed data.
 8. Run the complete Pytest test suite.
 
-Both GitHub Actions workflows currently pass successfully with the complete test suite.
+Both GitHub Actions workflows run the complete test suite in a clean environment.
 
-This ensures authentication, authorization, transactional order processing, database operations, and analytics are validated in a clean environment whenever changes are pushed.
+This ensures authentication, authorization, transactional order processing, database operations, and analytics are continuously validated as the project evolves.
 
 ---
 
-
-For the database section, I’d also add Alembic explicitly:
-
-```markdown
 ## Database Design
 
 The PostgreSQL database models core e-commerce entities including:
@@ -533,9 +572,13 @@ The PostgreSQL database models core e-commerce entities including:
 - Users
 - Refresh tokens
 
+The `users` model also stores authentication-security state including email verification status, verification token information, failed-login attempts, and temporary account lockout information.
+
 SQLAlchemy provides ORM-based database access, while Alembic manages database schema migrations.
 
 The analytics layer uses SQL-based aggregations over transactional e-commerce data to generate business metrics.
+
+---
 
 ## Security
 
@@ -543,6 +586,16 @@ The API includes several backend security controls:
 
 - Passwords are stored as secure password hashes rather than plaintext.
 - JWT access tokens are used for authenticated requests.
+- Refresh tokens support rotation and revocation.
+- New accounts must complete email verification before authentication.
+- Email verification tokens are time-limited and single-use.
+- Invalid and expired verification tokens are rejected.
+- Repeated failed login attempts trigger temporary account lockout.
+- Successful authentication resets failed-login tracking.
+- Password changes revoke existing refresh-token sessions.
+- Logout can revoke an individual refresh-token session.
+- Logout-all can revoke all active refresh-token sessions for a user.
+- Account deactivation revokes existing refresh tokens.
 - Inactive user accounts are rejected.
 - Administrative operations require the `admin` role.
 - Regular users cannot perform protected write operations.
@@ -553,16 +606,16 @@ The API includes several backend security controls:
 
 ## Future Improvements
 
-- Login abuse protection and temporary account lockout
 - Rate limiting
+- Password reset workflow
 - Streamlit analytics dashboard
 - Cloud API deployment
 - Managed PostgreSQL deployment
 - Redis caching
 - Expanded integration testing
 - Frontend analytics dashboard
-- Email verification
-- Password reset workflow
+
+---
 
 ## Author
 
@@ -575,7 +628,5 @@ Backend Software Engineering | Python | FastAPI | PostgreSQL | SQL
 
 ### Connect with Me
 
-### Connect with Me
-
-- GitHub: [github.com/LilTeo48](https://github.com/LilTeo48)
-- LinkedIn: [linkedin.com/in/tyler-chadwick-81b9a6275](https://www.linkedin.com/in/tyler-chadwick-81b9a6275/)
+- GitHub: `github.com/LilTeo48`
+- LinkedIn: `linkedin.com/in/tyler-chadwick-81b9a6275`

@@ -261,7 +261,22 @@ class User(Base):
         unique=True,
     )
 
-    verification_token_expires_at: Mapped[datetime | None] = mapped_column(
+    verification_token_expires_at: Mapped[
+        datetime | None
+    ] = mapped_column(
+        DateTime,
+        nullable=True,
+    )
+
+    password_reset_token: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+        unique=True,
+    )
+
+    password_reset_token_expires_at: Mapped[
+        datetime | None
+    ] = mapped_column(
         DateTime,
         nullable=True,
     )

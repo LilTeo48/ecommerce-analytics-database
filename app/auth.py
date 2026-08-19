@@ -1,10 +1,12 @@
 from datetime import datetime, timedelta, timezone
 import secrets
 
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from jwt import InvalidTokenError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+
 
 from app.database import get_db
 from app.models import RefreshToken, User
@@ -12,6 +14,8 @@ from app.schemas import (
     ChangePasswordRequest,
     DeactivateAccountRequest,
     EmailVerificationRequest,
+    PasswordResetConfirm,
+    PasswordResetRequest,
     RefreshTokenRequest,
     Token,
     UserCreate,
@@ -33,9 +37,11 @@ router = APIRouter(
     tags=["Authentication"],
 )
 
+
 MAX_FAILED_LOGIN_ATTEMPTS = 5
 ACCOUNT_LOCKOUT_MINUTES = 15
 EMAIL_VERIFICATION_EXPIRE_HOURS = 24
+PASSWORD_RESET_EXPIRE_HOURS = 1
 
 
 def utc_now_naive() -> datetime:
@@ -143,6 +149,124 @@ def verify_email(
     return {
         "detail": "Email verified successfully.",
     }
+
+@router.post(
+    "/forgot-password",
+    status_code=status.HTTP_200_OK,
+)
+def forgot_password(
+    request: PasswordResetRequest,
+    db: Session = Depends(get_db),
+):
+    user = db.scalar(
+        select(User).where(
+            User.email == request.email
+        )
+    )
+
+    # Always return the same response so the endpoint
+    # does not reveal whether an email is registered.
+    if user is None:
+        return {
+            "detail": (
+                "If an account with that email exists, "
+                "a password reset link has been generated."
+            )
+        }
+
+    reset_token = secrets.token_urlsafe(32)
+
+    user.password_reset_token = reset_token
+    user.password_reset_token_expires_at = (
+    utc_now_naive()
+    + timedelta(
+        hours=PASSWORD_RESET_EXPIRE_HOURS
+    )
+)
+
+    db.commit()
+
+    return {
+        "detail": (
+            "If an account with that email exists, "
+            "a password reset link has been generated."
+        )
+    }
+
+@router.post(
+    "/reset-password",
+    status_code=status.HTTP_200_OK,
+)
+def reset_password(
+    reset_data: PasswordResetConfirm,
+    db: Session = Depends(get_db),
+):
+    user = db.scalar(
+        select(User).where(
+            User.password_reset_token
+            == reset_data.token
+        )
+    )
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid password reset token.",
+        )
+
+    now = utc_now_naive()
+
+    if (
+        user.password_reset_token_expires_at is None
+        or user.password_reset_token_expires_at <= now
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password reset token has expired.",
+        )
+
+    if verify_password(
+        reset_data.new_password,
+        user.hashed_password,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "New password must be different "
+                "from current password."
+            ),
+        )
+
+    user.hashed_password = hash_password(
+        reset_data.new_password
+    )
+
+    # A successful password reset consumes the token.
+    user.password_reset_token = None
+    user.password_reset_token_expires_at = None
+
+    # Clear any existing login lockout state.
+    user.failed_login_attempts = 0
+    user.locked_until = None
+
+    # Revoke existing sessions after a password reset.
+    active_refresh_tokens = db.scalars(
+        select(RefreshToken).where(
+            RefreshToken.user_id == user.user_id,
+            RefreshToken.revoked_at.is_(None),
+        )
+    ).all()
+
+    for refresh_token in active_refresh_tokens:
+        refresh_token.revoked_at = now
+
+    db.commit()
+
+    return {
+        "detail": "Password reset successfully.",
+    }    
+
+    
 
 
 @router.post(

@@ -1769,3 +1769,405 @@ def test_verification_token_cannot_be_reused():
         "Invalid verification token."
     )
 
+def get_password_reset_token(email: str) -> str:
+    response = client.post(
+        "/auth/forgot-password",
+        json={
+            "email": email,
+        },
+    )
+
+    assert response.status_code == 200
+
+    with SessionLocal() as db:
+        user = db.scalar(
+            select(User).where(
+                User.email == email
+            )
+        )
+
+        assert user is not None
+        assert user.password_reset_token is not None
+
+        return user.password_reset_token
+
+def test_forgot_password_generates_reset_token():
+    email = f"pytest_forgot_{uuid4().hex}@example.com"
+    password = "Password123!"
+
+    register_response = client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert register_response.status_code == 201
+
+    response = client.post(
+        "/auth/forgot-password",
+        json={
+            "email": email,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "detail": (
+            "If an account with that email exists, "
+            "a password reset link has been generated."
+        )
+    }
+
+    with SessionLocal() as db:
+        user = db.scalar(
+            select(User).where(
+                User.email == email
+            )
+        )
+
+        assert user is not None
+        assert user.password_reset_token is not None
+        assert user.password_reset_token_expires_at is not None
+
+
+def test_forgot_password_unknown_email_returns_generic_response():
+    email = f"missing_{uuid4().hex}@example.com"
+
+    response = client.post(
+        "/auth/forgot-password",
+        json={
+            "email": email,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "detail": (
+            "If an account with that email exists, "
+            "a password reset link has been generated."
+        )
+    }
+
+
+def test_reset_password_success():
+    email = f"pytest_reset_{uuid4().hex}@example.com"
+    old_password = "Password123!"
+    new_password = "NewPassword123!"
+
+    register_response = client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": old_password,
+        },
+    )
+
+    assert register_response.status_code == 201
+
+    token = get_password_reset_token(email)
+
+    response = client.post(
+        "/auth/reset-password",
+        json={
+            "token": token,
+            "new_password": new_password,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "detail": "Password reset successfully.",
+    }
+
+
+def test_reset_password_invalid_token():
+    response = client.post(
+        "/auth/reset-password",
+        json={
+            "token": "invalid-token",
+            "new_password": "NewPassword123!",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": "Invalid password reset token.",
+    }
+
+
+def test_reset_password_expired_token():
+    email = f"pytest_reset_expired_{uuid4().hex}@example.com"
+    password = "Password123!"
+
+    register_response = client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert register_response.status_code == 201
+
+    token = get_password_reset_token(email)
+
+    with SessionLocal() as db:
+        user = db.scalar(
+            select(User).where(
+                User.email == email
+            )
+        )
+
+        assert user is not None
+
+        user.password_reset_token_expires_at = (
+            datetime.now(timezone.utc)
+            .replace(tzinfo=None)
+            - timedelta(minutes=1)
+        )
+
+        db.commit()
+
+    response = client.post(
+        "/auth/reset-password",
+        json={
+            "token": token,
+            "new_password": "NewPassword123!",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": "Password reset token has expired.",
+    }
+
+
+def test_reset_password_token_cannot_be_reused():
+    email = f"pytest_reset_reuse_{uuid4().hex}@example.com"
+    old_password = "Password123!"
+    new_password = "NewPassword123!"
+
+    register_response = client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": old_password,
+        },
+    )
+
+    assert register_response.status_code == 201
+
+    token = get_password_reset_token(email)
+
+    first_response = client.post(
+        "/auth/reset-password",
+        json={
+            "token": token,
+            "new_password": new_password,
+        },
+    )
+
+    assert first_response.status_code == 200
+
+    second_response = client.post(
+        "/auth/reset-password",
+        json={
+            "token": token,
+            "new_password": "AnotherPassword123!",
+        },
+    )
+
+    assert second_response.status_code == 400
+    assert second_response.json() == {
+        "detail": "Invalid password reset token.",
+    }
+
+
+def test_old_password_fails_after_password_reset():
+    email = f"pytest_reset_old_{uuid4().hex}@example.com"
+    old_password = "Password123!"
+    new_password = "NewPassword123!"
+
+    register_response = client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": old_password,
+        },
+    )
+
+    assert register_response.status_code == 201
+
+    verify_test_user(email)
+
+    token = get_password_reset_token(email)
+
+    reset_response = client.post(
+        "/auth/reset-password",
+        json={
+            "token": token,
+            "new_password": new_password,
+        },
+    )
+
+    assert reset_response.status_code == 200
+
+    response = client.post(
+        "/auth/login",
+        json={
+            "email": email,
+            "password": old_password,
+        },
+    )
+
+    assert response.status_code == 401
+
+
+def test_new_password_works_after_password_reset():
+    email = f"pytest_reset_new_{uuid4().hex}@example.com"
+    old_password = "Password123!"
+    new_password = "NewPassword123!"
+
+    register_response = client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": old_password,
+        },
+    )
+
+    assert register_response.status_code == 201
+
+    verify_test_user(email)
+
+    token = get_password_reset_token(email)
+
+    reset_response = client.post(
+        "/auth/reset-password",
+        json={
+            "token": token,
+            "new_password": new_password,
+        },
+    )
+
+    assert reset_response.status_code == 200
+
+    response = client.post(
+        "/auth/login",
+        json={
+            "email": email,
+            "password": new_password,
+        },
+    )
+
+    assert response.status_code == 200
+    assert "access_token" in response.json()
+    assert "refresh_token" in response.json()
+
+
+def test_password_reset_revokes_existing_refresh_tokens():
+    email = f"pytest_reset_revoke_{uuid4().hex}@example.com"
+    old_password = "Password123!"
+    new_password = "NewPassword123!"
+
+    register_response = client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": old_password,
+        },
+    )
+
+    assert register_response.status_code == 201
+
+    verify_test_user(email)
+
+    login_response = client.post(
+        "/auth/login",
+        json={
+            "email": email,
+            "password": old_password,
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    refresh_token = login_response.json()["refresh_token"]
+
+    token = get_password_reset_token(email)
+
+    reset_response = client.post(
+        "/auth/reset-password",
+        json={
+            "token": token,
+            "new_password": new_password,
+        },
+    )
+
+    assert reset_response.status_code == 200
+
+    refresh_response = client.post(
+        "/auth/refresh",
+        json={
+            "refresh_token": refresh_token,
+        },
+    )
+
+    assert refresh_response.status_code == 401
+    assert refresh_response.json() == {
+        "detail": "Refresh token has been revoked.",
+    }
+
+
+def test_password_reset_clears_lockout_state():
+    email = f"pytest_reset_lockout_{uuid4().hex}@example.com"
+    password = "Password123!"
+    new_password = "NewPassword123!"
+
+    register_response = client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert register_response.status_code == 201
+
+    verify_test_user(email)
+
+    for _ in range(5):
+        response = client.post(
+            "/auth/login",
+            json={
+                "email": email,
+                "password": "WrongPassword123!",
+            },
+        )
+
+        assert response.status_code == 401
+
+    token = get_password_reset_token(email)
+
+    reset_response = client.post(
+        "/auth/reset-password",
+        json={
+            "token": token,
+            "new_password": new_password,
+        },
+    )
+
+    assert reset_response.status_code == 200
+
+    login_response = client.post(
+        "/auth/login",
+        json={
+            "email": email,
+            "password": new_password,
+        },
+    )
+
+    assert login_response.status_code == 200            
+

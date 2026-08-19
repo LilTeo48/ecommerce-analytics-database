@@ -2,7 +2,7 @@
 
 A production-style backend REST API built with **FastAPI, PostgreSQL, SQLAlchemy, and Docker** for managing e-commerce operations and generating business analytics.
 
-The project demonstrates backend API development, relational database design, JWT authentication, email verification, role-based access control (RBAC), secure session management, transactional order processing, automated testing, containerization, database migrations, and continuous integration with GitHub Actions.
+The project demonstrates backend API development, relational database design, JWT authentication, email verification, secure password reset, role-based access control (RBAC), secure session management, transactional order processing, automated testing, containerization, database migrations, and continuous integration with GitHub Actions.
 
 ## Features
 
@@ -18,6 +18,8 @@ The project demonstrates backend API development, relational database design, JW
 - Protected API endpoints
 - Authenticated user profile endpoint
 - Password change with session revocation
+- Secure password reset with expiring, single-use tokens
+- Password reset with existing-session revocation
 - Logout and logout-all session management
 - Temporary account lockout after repeated failed login attempts
 - Account deactivation
@@ -62,6 +64,8 @@ The project demonstrates backend API development, relational database design, JW
 - Bearer token authentication
 - Access and refresh tokens
 - Email verification
+- Secure password reset
+- Expiring, single-use password reset tokens
 - Refresh token rotation and revocation
 - Temporary account lockout
 - Role-based access control (RBAC)
@@ -164,6 +168,10 @@ Authentication features include:
 - Authenticated user profile retrieval
 - Password changes
 - Session revocation after password changes
+- Password reset requests
+- Expiring, single-use password reset tokens
+- Password reset token validation
+- Session revocation after password resets
 - Failed-login tracking
 - Temporary account lockout after repeated failed login attempts
 - Account deactivation
@@ -354,7 +362,7 @@ New users must verify their email before logging in. Registration creates a time
 ```bash
 curl -X POST http://localhost:8000/auth/verify-email \
   -H "Content-Type: application/json" \
-  -d '{"token":"<VERIFICATION_TOKEN>"}'
+  -d '{"verification_token":"<VERIFICATION_TOKEN>"}'
 ```
 
 A valid verification token activates email verification for the account.
@@ -380,6 +388,36 @@ A successful login returns an access token and refresh token:
 ```
 
 Unverified accounts are rejected until email verification has been completed.
+
+### Request a Password Reset
+
+```bash
+curl -X POST http://localhost:8000/auth/forgot-password \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com"}'
+```
+
+The API generates a cryptographically secure, time-limited password reset token for registered accounts.
+
+The endpoint returns the same generic response regardless of whether the email exists, reducing account enumeration risk.
+
+### Reset Password
+
+```bash
+curl -X POST http://localhost:8000/auth/reset-password \
+  -H "Content-Type: application/json" \
+  -d '{"token":"<PASSWORD_RESET_TOKEN>","new_password":"NewPassword123!"}'
+```
+
+A successful password reset:
+
+- Validates the reset token and its expiration
+- Replaces the existing password with a securely hashed new password
+- Invalidates the reset token so it cannot be reused
+- Revokes existing refresh-token sessions
+- Clears failed-login and temporary-lockout state
+
+> Password reset tokens are currently generated and stored by the backend. Integration with an external email delivery provider is a future improvement.
 
 ### Access a Protected Endpoint
 
@@ -499,6 +537,16 @@ The project includes a comprehensive Pytest test suite covering:
 - Authenticated user profile access
 - Password changes
 - Session revocation after password changes
+- Password reset token generation
+- Unknown-email enumeration protection
+- Successful password reset
+- Invalid password reset token rejection
+- Expired password reset token rejection
+- Password reset token reuse prevention
+- Old-password rejection after password reset
+- New-password authentication after password reset
+- Session revocation after password reset
+- Lockout-state clearing after password reset
 - Failed-login tracking
 - Temporary account lockout
 - Successful-login failure-counter reset
@@ -528,7 +576,7 @@ The tests exercise the FastAPI application against PostgreSQL and verify API res
 The current test suite passes:
 
 ```text
-115 passed
+125 passed
 ```
 
 ---
@@ -572,7 +620,7 @@ The PostgreSQL database models core e-commerce entities including:
 - Users
 - Refresh tokens
 
-The `users` model also stores authentication-security state including email verification status, verification token information, failed-login attempts, and temporary account lockout information.
+The `users` model also stores authentication-security state including email verification status, verification token information, password reset token information, failed-login attempts, and temporary account lockout information.
 
 SQLAlchemy provides ORM-based database access, while Alembic manages database schema migrations.
 
@@ -593,6 +641,10 @@ The API includes several backend security controls:
 - Repeated failed login attempts trigger temporary account lockout.
 - Successful authentication resets failed-login tracking.
 - Password changes revoke existing refresh-token sessions.
+- Password reset tokens are cryptographically generated, time-limited, and single-use.
+- Password reset requests use generic responses to reduce account enumeration risk.
+- Successful password resets revoke existing refresh-token sessions.
+- Successful password resets clear failed-login and temporary-lockout state.
 - Logout can revoke an individual refresh-token session.
 - Logout-all can revoke all active refresh-token sessions for a user.
 - Account deactivation revokes existing refresh tokens.
@@ -607,7 +659,7 @@ The API includes several backend security controls:
 ## Future Improvements
 
 - Rate limiting
-- Password reset workflow
+- Email delivery integration for verification and password reset links
 - Streamlit analytics dashboard
 - Cloud API deployment
 - Managed PostgreSQL deployment

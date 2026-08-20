@@ -23,6 +23,18 @@ from app.models import User
 def client():
     return TestClient(app)
 
+@pytest.fixture(autouse=True)
+def mock_email_sending(monkeypatch):
+    monkeypatch.setattr(
+        "app.auth.send_verification_email",
+        lambda *args, **kwargs: None,
+    )
+
+    monkeypatch.setattr(
+        "app.auth.send_password_reset_email",
+        lambda *args, **kwargs: None,
+    )    
+
 
 @pytest.fixture
 def auth_headers(client):
@@ -132,3 +144,5 @@ def admin_client(client):
     )
 
     return client
+
+   

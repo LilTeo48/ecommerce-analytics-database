@@ -1612,6 +1612,48 @@ def test_registration_creates_verification_token():
         assert user.verification_token is not None
         assert user.verification_token_expires_at is not None
 
+def test_registration_sends_verification_email(
+    monkeypatch,
+):
+    email = f"pytest_email_send_{uuid4().hex}@example.com"
+    password = "Password123!"
+
+    captured = {}
+
+    def fake_send_verification_email(
+        sent_email,
+        verification_token,
+    ):
+        captured["email"] = sent_email
+        captured["token"] = verification_token
+
+    monkeypatch.setattr(
+        "app.auth.send_verification_email",
+        fake_send_verification_email,
+    )
+
+    response = client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert response.status_code == 201
+
+    with SessionLocal() as db:
+        user = db.scalar(
+            select(User).where(
+                User.email == email
+            )
+        )
+
+        assert user is not None
+        assert user.verification_token is not None
+
+        assert captured["email"] == email
+        assert captured["token"] == user.verification_token
 
 def test_verify_email_success():
     email = f"pytest_verify_success_{uuid4().hex}@example.com"
@@ -1849,6 +1891,58 @@ def test_forgot_password_unknown_email_returns_generic_response():
             "a password reset link has been generated."
         )
     }
+
+def test_forgot_password_sends_reset_email(
+    monkeypatch,
+):
+    email = f"pytest_reset_email_{uuid4().hex}@example.com"
+    password = "Password123!"
+
+    register_response = client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert register_response.status_code == 201
+
+    captured = {}
+
+    def fake_send_password_reset_email(
+        sent_email,
+        reset_token,
+    ):
+        captured["email"] = sent_email
+        captured["token"] = reset_token
+
+    monkeypatch.setattr(
+        "app.auth.send_password_reset_email",
+        fake_send_password_reset_email,
+    )
+
+    response = client.post(
+        "/auth/forgot-password",
+        json={
+            "email": email,
+        },
+    )
+
+    assert response.status_code == 200
+
+    with SessionLocal() as db:
+        user = db.scalar(
+            select(User).where(
+                User.email == email
+            )
+        )
+
+        assert user is not None
+        assert user.password_reset_token is not None
+
+        assert captured["email"] == email
+        assert captured["token"] == user.password_reset_token
 
 
 def test_reset_password_success():

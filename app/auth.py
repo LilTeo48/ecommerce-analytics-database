@@ -7,6 +7,11 @@ from jwt import InvalidTokenError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.email_service import (
+    send_password_reset_email,
+    send_verification_email,
+)
+
 
 from app.database import get_db
 from app.models import RefreshToken, User
@@ -105,6 +110,11 @@ def register_user(
     db.commit()
     db.refresh(new_user)
 
+    send_verification_email(
+        new_user.email,
+        verification_token,
+    )
+
     return new_user
 
 
@@ -178,13 +188,18 @@ def forgot_password(
 
     user.password_reset_token = reset_token
     user.password_reset_token_expires_at = (
-    utc_now_naive()
-    + timedelta(
-        hours=PASSWORD_RESET_EXPIRE_HOURS
+        utc_now_naive()
+        + timedelta(
+            hours=PASSWORD_RESET_EXPIRE_HOURS
+        )
     )
-)
 
     db.commit()
+
+    send_password_reset_email(
+        user.email,
+        reset_token,
+    )
 
     return {
         "detail": (

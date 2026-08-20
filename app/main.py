@@ -1,9 +1,20 @@
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from sqlalchemy import text
 
+load_dotenv(".env")
+
 from app import auth
 from app.database import SessionLocal
-from app.routers import analytics, customers, inventory, orders, payments, products, shipments
+from app.routers import (
+    analytics,
+    customers,
+    inventory,
+    orders,
+    payments,
+    products,
+    shipments,
+)
 
 app = FastAPI(
     title="E-Commerce Analytics API",

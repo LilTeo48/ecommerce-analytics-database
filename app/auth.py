@@ -1,19 +1,17 @@
 from datetime import datetime, timedelta, timezone
 import secrets
 
-
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from jwt import InvalidTokenError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.database import get_db
 from app.email_service import (
     send_password_reset_email,
     send_verification_email,
 )
-
-
-from app.database import get_db
 from app.models import RefreshToken, User
 from app.schemas import (
     ChangePasswordRequest,
@@ -47,7 +45,6 @@ MAX_FAILED_LOGIN_ATTEMPTS = 5
 ACCOUNT_LOCKOUT_MINUTES = 15
 EMAIL_VERIFICATION_EXPIRE_HOURS = 24
 PASSWORD_RESET_EXPIRE_HOURS = 1
-
 
 def utc_now_naive() -> datetime:
     """
@@ -281,20 +278,14 @@ def reset_password(
         "detail": "Password reset successfully.",
     }    
 
-    
-
-
-@router.post(
-    "/login",
-    response_model=Token,
-)
-def login_user(
-    credentials: UserLogin,
-    db: Session = Depends(get_db),
-):
+def authenticate_user_and_create_tokens(
+    email: str,
+    password: str,
+    db: Session,
+) -> dict:
     user = db.scalar(
         select(User).where(
-            User.email == credentials.email
+            User.email == email
         )
     )
 
@@ -331,12 +322,11 @@ def login_user(
                 ),
             )
 
-        # Previous lockout has expired.
         user.locked_until = None
         user.failed_login_attempts = 0
 
     if not verify_password(
-        credentials.password,
+        password,
         user.hashed_password,
     ):
         user.failed_login_attempts += 1
@@ -398,6 +388,36 @@ def login_user(
         "refresh_token": refresh_token,
         "token_type": "bearer",
     }
+
+
+@router.post(
+    "/login",
+    response_model=Token,
+)
+def login_user(
+    credentials: UserLogin,
+    db: Session = Depends(get_db),
+):
+    return authenticate_user_and_create_tokens(
+        email=credentials.email,
+        password=credentials.password,
+        db=db,
+    )
+
+@router.post(
+    "/token",
+    response_model=Token,
+)
+def swagger_login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
+):
+    return authenticate_user_and_create_tokens(
+        email=form_data.username,
+        password=form_data.password,
+        db=db,
+    )
+
 
 @router.post(
     "/refresh",

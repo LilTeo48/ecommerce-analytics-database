@@ -34,7 +34,7 @@ if not SECRET_KEY:
 
 
 oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl="/auth/login"
+    tokenUrl="/auth/token"
 )
 
 
